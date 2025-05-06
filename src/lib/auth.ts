@@ -43,6 +43,7 @@ export async function confirmCode(verificationId: string, code: string): Promise
     const user: User = {
       id: firebaseUser.uid,
       phoneNumber: firebaseUser.phoneNumber || '',
+      email: '', // Required field for phone auth users
       displayName: 'New Player', // Set a default display name
       firstName: '',
       lastName: '',
