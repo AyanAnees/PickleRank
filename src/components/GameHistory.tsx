@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { User } from '../types';
 import { Game } from '@/types';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 
 interface GameHistoryProps {
   seasonId: string;
@@ -14,17 +14,19 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchGames = async () => {
+      if (!seasonId) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Fetch games
-        const gamesResponse = await fetch(`/api/seasons/${seasonId}/games`);
-        const gamesData = await gamesResponse.json();
-        
-        // Check if the response is an array (even if empty)
-        if (!Array.isArray(gamesData)) {
-          throw new Error('Invalid games data format');
+        const response = await fetch(`/api/seasons/${seasonId}/games`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch games');
         }
-        setGames(gamesData);
+        const data = await response.json();
+        setGames(data || []);
 
         // Fetch users
         const usersResponse = await fetch('/api/users');
@@ -38,19 +40,14 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
         setUsers(usersData);
         setError(null);
       } catch (error) {
-        console.error('Error fetching game history:', error);
-        // Don't set error for empty games, that's a valid state
-        if (error instanceof Error && !error.message.includes('Failed to fetch games')) {
-          setError(error.message);
-        }
+        console.error('Error fetching games:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch games');
       } finally {
         setLoading(false);
       }
     };
 
-    if (seasonId) {
-      fetchData();
-    }
+    fetchGames();
   }, [seasonId]);
 
   const getUserName = (userId: string) => {
@@ -58,8 +55,21 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
     return user?.displayName || 'Unknown Player';
   };
 
+  const formatGameTime = (gameTime: any) => {
+    if (!gameTime) return null;
+    try {
+      const date = new Date(gameTime);
+      return {
+        full: format(date, 'MMM d, yyyy h:mm a'),
+        relative: formatDistanceToNow(date, { addSuffix: true })
+      };
+    } catch (e) {
+      return null;
+    }
+  };
+
   if (loading) {
-    return <div>Loading game history...</div>;
+    return null;
   }
 
   if (error) {
@@ -83,34 +93,42 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
     <div className="card space-y-4">
       <h3 className="text-xl font-semibold">Game History</h3>
       <div className="space-y-4">
-        {games.map((game) => (
-          <div key={game.id} className="border rounded-lg p-4 bg-white shadow-sm">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">
-                      {game.team1.players.map(p => p.displayName).join(' & ')}
-                    </span>
-                    <span className="text-gray-500">vs</span>
-                    <span className="font-medium">
-                      {game.team2.players.map(p => p.displayName).join(' & ')}
-                    </span>
+        {games.map((game) => {
+          const gameTime = formatGameTime(game.gameTime);
+          return (
+            <div key={game.id} className="border rounded-lg p-4 bg-white shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium">
+                        {game.team1.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
+                      </span>
+                      <span className="text-gray-500">vs</span>
+                      <span className="font-medium">
+                        {game.team2.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
+                      </span>
+                    </div>
+                    {gameTime && (
+                      <div className="text-sm text-gray-500">
+                        <div>{gameTime.full}</div>
+                        <div className="text-xs">({gameTime.relative})</div>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {formatDistanceToNow(game.gameTime.toDate(), { addSuffix: true })}
+                  <div className="mt-1 text-sm text-gray-600">
+                    Score: {game.team1.score} - {game.team2.score}
                   </div>
-                </div>
-                <div className="mt-1 text-sm text-gray-600">
-                  Score: {game.team1.score} - {game.team2.score}
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  Recorded by {game.recordedBy.name}
+                  {game.recordedBy?.name && (
+                    <div className="mt-1 text-xs text-gray-500">
+                      Recorded by {game.recordedBy.name}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDoc, doc, updateDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, getDoc, doc, updateDoc, Timestamp, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { calculateEloChange } from '@/lib/elo';
 import { auth } from '@/lib/firebase';
 
@@ -68,6 +68,24 @@ export async function POST(request: Request) {
       ...team2.players.map((playerId: string) => getDoc(doc(rankingsRef, `${seasonId}_${playerId}`)))
     ]);
 
+    // Initialize rankings for any players that don't have them yet
+    const initPromises = rankings.map(async (rankingDoc, index) => {
+      if (!rankingDoc.exists()) {
+        const playerId = [...team1.players, ...team2.players][index];
+        const rankingRef = doc(rankingsRef, `${seasonId}_${playerId}`);
+        await setDoc(rankingRef, {
+          seasonId,
+          userId: playerId,
+          currentElo: 1500,
+          wins: 0,
+          losses: 0,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+      }
+    });
+    await Promise.all(initPromises);
+
     // Calculate average ELO for each team
     const team1Elo = rankings.slice(0, 2).reduce((sum, doc) => {
       const data = doc.data();
@@ -114,26 +132,24 @@ export async function POST(request: Request) {
       ...team1.players.map((playerId: string) => {
         const rankingRef = doc(rankingsRef, `${seasonId}_${playerId}`);
         const ranking = rankings.find(doc => doc.id === `${seasonId}_${playerId}`);
-        const data = ranking?.data() || { currentElo: 1500, gamesPlayed: 0, wins: 0 };
+        const data = ranking?.data() || { currentElo: 1500, wins: 0, losses: 0 };
         
         return updateDoc(rankingRef, {
           currentElo: data.currentElo + (team1Won ? eloChange : -eloChange),
-          gamesPlayed: (data.gamesPlayed || 0) + 1,
           wins: (data.wins || 0) + (team1Won ? 1 : 0),
-          winRate: ((data.wins || 0) + (team1Won ? 1 : 0)) / ((data.gamesPlayed || 0) + 1),
+          losses: (data.losses || 0) + (team1Won ? 0 : 1),
           updatedAt: Timestamp.now(),
         });
       }),
       ...team2.players.map((playerId: string) => {
         const rankingRef = doc(rankingsRef, `${seasonId}_${playerId}`);
         const ranking = rankings.find(doc => doc.id === `${seasonId}_${playerId}`);
-        const data = ranking?.data() || { currentElo: 1500, gamesPlayed: 0, wins: 0 };
+        const data = ranking?.data() || { currentElo: 1500, wins: 0, losses: 0 };
         
         return updateDoc(rankingRef, {
           currentElo: data.currentElo + (team1Won ? -eloChange : eloChange),
-          gamesPlayed: (data.gamesPlayed || 0) + 1,
           wins: (data.wins || 0) + (team1Won ? 0 : 1),
-          winRate: ((data.wins || 0) + (team1Won ? 0 : 1)) / ((data.gamesPlayed || 0) + 1),
+          losses: (data.losses || 0) + (team1Won ? 1 : 0),
           updatedAt: Timestamp.now(),
         });
       }),

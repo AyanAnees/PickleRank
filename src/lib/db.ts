@@ -128,13 +128,13 @@ export async function getSeasonRankings(seasonId: string): Promise<{ rankings: S
     const rankingsSnapshot = await getDocs(rankingsQuery);
     const allRankings = rankingsSnapshot.docs.map(doc => {
       const data = doc.data();
-      const gamesPlayed = data.wins + data.losses;
+      const gamesPlayed = (data.wins || 0) + (data.losses || 0);
       return {
         userId: data.userId,
         seasonId: data.seasonId,
         currentElo: data.currentElo,
         gamesPlayed,
-        winRate: gamesPlayed > 0 ? data.wins / gamesPlayed : 0,
+        winRate: gamesPlayed > 0 ? (data.wins || 0) / gamesPlayed : 0,
         rank: 0 // Will be set after sorting
       };
     }) as SeasonRanking[];
