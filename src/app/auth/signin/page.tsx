@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import ReCAPTCHA from 'react-google-recaptcha';
+import Link from 'next/link';
 
 export default function SignIn() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -15,6 +15,7 @@ export default function SignIn() {
   const [isNewUser, setIsNewUser] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [consent, setConsent] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [recaptchaCompleted, setRecaptchaCompleted] = useState(false);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -22,18 +23,108 @@ export default function SignIn() {
   const searchParams = useSearchParams();
   const from = searchParams.get('from') || '/';
 
-  const initializeRecaptcha = async () => {
-    try {
-      // Clear any existing reCAPTCHA
+  // Check if user is already registered
+  useEffect(() => {
+    const checkUserRegistration = async () => {
+      try {
+        const user = auth.currentUser;
+        if (user) {
+          // Get the ID token
+          const idToken = await user.getIdToken();
+          
+          // Set the token in a cookie
+          document.cookie = `auth-token=${idToken}; path=/`;
+
+          // Check registration status
+          const response = await fetch('/api/users/me', {
+            headers: {
+              'Cookie': `auth-token=${idToken}`
+            }
+          });
+
+          if (response.ok) {
+            const userData = await response.json();
+            if (userData && userData.firstName && userData.lastName) {
+              // User is already registered, redirect to dashboard
+              router.push('/dashboard');
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking user registration:', error);
+        // Clear any existing auth token on error
+        document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      }
+    };
+
+    checkUserRegistration();
+  }, [router]);
+
+  useEffect(() => {
+    // Initialize reCAPTCHA
+    const initializeRecaptcha = () => {
+      try {
+        const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'normal',
+          callback: () => {
+            setRecaptchaCompleted(true);
+            setError(null);
+          },
+          'expired-callback': () => {
+            setRecaptchaCompleted(false);
+            setError('reCAPTCHA expired. Please verify again.');
+          },
+          'error-callback': () => {
+            setRecaptchaCompleted(false);
+            setError('reCAPTCHA error. Please try again.');
+          }
+        });
+
+        recaptchaVerifierRef.current = verifier;
+        verifier.render();
+      } catch (error) {
+        console.error('Error initializing reCAPTCHA:', error);
+        setError('Error loading reCAPTCHA. Please refresh the page.');
+      }
+    };
+
+    // Check network connectivity
+    if (!navigator.onLine) {
+      setError('No internet connection. Please check your network and try again.');
+      return;
+    }
+
+    initializeRecaptcha();
+
+    // Cleanup function
+    return () => {
       if (recaptchaVerifierRef.current) {
         recaptchaVerifierRef.current.clear();
         recaptchaVerifierRef.current = null;
       }
+    };
+  }, []);
 
-      // Wait for the container to be ready
-      await new Promise(resolve => setTimeout(resolve, 500));
+  // Add a retry button for reCAPTCHA
+  const handleRetryRecaptcha = () => {
+    setError(null);
+    const container = document.getElementById('recaptcha-container');
+    if (container) {
+      container.innerHTML = '';
+    }
+    if (recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current.clear();
+      recaptchaVerifierRef.current = null;
+    }
 
-      // Create new reCAPTCHA verifier
+    // Check network connectivity
+    if (!navigator.onLine) {
+      setError('No internet connection. Please check your network and try again.');
+      return;
+    }
+
+    try {
       const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'normal',
         callback: () => {
@@ -49,50 +140,12 @@ export default function SignIn() {
           setError('reCAPTCHA error. Please try again.');
         }
       });
-
-      // Store the verifier
       recaptchaVerifierRef.current = verifier;
-
-      // Render the reCAPTCHA
-      await verifier.render();
+      verifier.render();
     } catch (error) {
       console.error('Error initializing reCAPTCHA:', error);
       setError('Error loading reCAPTCHA. Please refresh the page.');
-      
-      // Clear the verifier on error
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-        recaptchaVerifierRef.current = null;
-      }
     }
-  };
-
-  useEffect(() => {
-    // Initialize reCAPTCHA
-    initializeRecaptcha();
-
-    // Cleanup function
-    return () => {
-      try {
-        if (recaptchaVerifierRef.current) {
-          recaptchaVerifierRef.current.clear();
-          recaptchaVerifierRef.current = null;
-        }
-      } catch (error) {
-        console.error('Error cleaning up reCAPTCHA:', error);
-      }
-    };
-  }, []);
-
-  // Add a retry button for reCAPTCHA
-  const handleRetryRecaptcha = () => {
-    setError(null);
-    const container = document.getElementById('recaptcha-container');
-    if (container) {
-      container.innerHTML = ''; // Clear the container
-    }
-    // Re-initialize reCAPTCHA
-    initializeRecaptcha();
   };
 
   const formatPhoneNumber = (value: string) => {
@@ -149,6 +202,11 @@ export default function SignIn() {
         throw new Error('No internet connection. Please check your network and try again.');
       }
 
+      // Check if Firebase is available
+      if (!auth) {
+        throw new Error('Authentication service is not available. Please try again later.');
+      }
+
       const confirmationResult = await signInWithPhoneNumber(auth, e164Phone, recaptchaVerifierRef.current);
       setVerificationId(confirmationResult.verificationId);
       setVerificationSent(true);
@@ -158,6 +216,8 @@ export default function SignIn() {
       // Handle specific error cases
       if (err.code === 'auth/network-request-failed') {
         setError('Network error. Please check your internet connection and try again.');
+        // Clear any existing auth token
+        document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       } else if (err.code === 'auth/invalid-phone-number') {
         setError('Invalid phone number format. Please check and try again.');
       } else if (err.code === 'auth/too-many-requests') {
@@ -180,12 +240,25 @@ export default function SignIn() {
         throw new Error('No verification ID found');
       }
 
+      // Check network connectivity
+      if (!navigator.onLine) {
+        throw new Error('No internet connection. Please check your network and try again.');
+      }
+
+      // Check if Firebase is available
+      if (!auth) {
+        throw new Error('Authentication service is not available. Please try again later.');
+      }
+
       const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
       const userCredential = await signInWithCredential(auth, credential);
       
       // Get the ID token
       const idToken = await userCredential.user.getIdToken();
       
+      // Set the token in a cookie immediately
+      document.cookie = `auth-token=${idToken}; path=/`;
+
       // Verify the token with our API
       const verifyResponse = await fetch('/api/auth/verify', {
         method: 'POST',
@@ -200,7 +273,12 @@ export default function SignIn() {
       }
 
       // Check if this is a new user or if registration is incomplete
-      const response = await fetch(`/api/users?id=${userCredential.user.uid}`);
+      const response = await fetch('/api/users/me', {
+        headers: {
+          'Cookie': `auth-token=${idToken}`
+        }
+      });
+
       if (!response.ok) {
         setIsNewUser(true);
         return;
@@ -209,19 +287,24 @@ export default function SignIn() {
       const userData = await response.json();
       
       // Check if registration is incomplete (no firstName or lastName)
-      if (!userData.firstName || !userData.lastName) {
+      if (!userData || !userData.firstName || !userData.lastName) {
         setIsNewUser(true);
         return;
       }
 
-      // Set the token in a cookie
-      document.cookie = `auth-token=${idToken}; path=/`;
-      
-      // Redirect to the original destination or home page
-      router.push(from);
-    } catch (err) {
-      setError('Invalid verification code. Please try again.');
+      // User is registered, redirect to dashboard
+      router.push('/dashboard');
+    } catch (err: any) {
       console.error('Error verifying code:', err);
+      
+      // Handle specific error cases
+      if (err.code === 'auth/network-request-failed') {
+        setError('Network error. Please check your internet connection and try again.');
+        // Clear any existing auth token
+        document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      } else {
+        setError('Invalid verification code. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -233,9 +316,21 @@ export default function SignIn() {
     setLoading(true);
 
     try {
+      if (!consent) {
+        setError('Please accept the Terms of Service and Privacy Policy to continue');
+        setLoading(false);
+        return;
+      }
+
       if (!auth.currentUser) {
         throw new Error('No authenticated user found');
       }
+
+      // Get a fresh token
+      const idToken = await auth.currentUser.getIdToken(true);
+      
+      // Set the token in a cookie
+      document.cookie = `auth-token=${idToken}; path=/`;
 
       const userData = {
         id: auth.currentUser.uid,
@@ -257,6 +352,7 @@ export default function SignIn() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cookie': `auth-token=${idToken}`
         },
         body: JSON.stringify(userData),
       });
@@ -266,17 +362,13 @@ export default function SignIn() {
         throw new Error(data.error || 'Failed to create account');
       }
 
-      // Get the ID token
-      const idToken = await auth.currentUser.getIdToken();
-      
-      // Set the token in a cookie
-      document.cookie = `auth-token=${idToken}; path=/`;
-      
-      // Redirect to the original destination or home page
-      router.push(from);
+      // Registration successful, redirect to dashboard
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to create account');
       console.error('Registration error:', err);
+      // Clear any existing auth token on error
+      document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     } finally {
       setLoading(false);
     }
@@ -419,6 +511,28 @@ export default function SignIn() {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   required
                 />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  id="consent"
+                  name="consent"
+                  type="checkbox"
+                  required
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                />
+                <label htmlFor="consent" className="ml-2 block text-sm text-gray-900">
+                  I agree to the{' '}
+                  <Link href="/terms" className="text-indigo-600 hover:text-indigo-500" target="_blank">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/privacy" className="text-indigo-600 hover:text-indigo-500" target="_blank">
+                    Privacy Policy
+                  </Link>
+                </label>
               </div>
             </div>
 

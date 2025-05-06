@@ -1,6 +1,6 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
@@ -14,8 +14,35 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+let app: FirebaseApp | undefined;
+
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+} catch (error) {
+  console.error('Error initializing Firebase:', error);
+  // In development, we'll retry initialization after a short delay
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Retrying Firebase initialization in development mode...');
+    setTimeout(() => {
+      try {
+        app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+      } catch (retryError) {
+        console.error('Failed to initialize Firebase after retry:', retryError);
+      }
+    }, 1000);
+  } else {
+    throw error;
+  }
+}
+
+if (!app) {
+  throw new Error('Failed to initialize Firebase');
+}
+
+// Initialize Auth
 const auth = getAuth(app);
+
+// Initialize Firestore
 const db = getFirestore(app);
 
 // Initialize Analytics only on the client side and if supported

@@ -8,6 +8,7 @@ import SeasonRankings from '@/components/SeasonRankings';
 import RecordGame from '@/components/RecordGame';
 import GameHistory from '@/components/GameHistory';
 import { Season } from '@/types';
+import { signOut } from '@/lib/auth';
 
 export default function Dashboard() {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
@@ -16,15 +17,41 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.push('/');
-        return;
-      }
-      setLoading(false);
-    });
+    const checkAuth = async () => {
+      try {
+        // First check if user is authenticated
+        const user = auth.currentUser;
+        if (!user) {
+          router.push('/auth/signin');
+          return;
+        }
 
-    return () => unsubscribe();
+        // Then check if registration is complete
+        const response = await fetch('/api/users/me');
+        if (!response.ok) {
+          // If user data doesn't exist or there's an error, redirect to sign in
+          await signOut();
+          router.push('/auth/signin');
+          return;
+        }
+
+        const userData = await response.json();
+        if (!userData || !userData.firstName || !userData.lastName) {
+          // If registration is incomplete, redirect to sign in
+          await signOut();
+          router.push('/auth/signin');
+          return;
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        await signOut();
+        router.push('/auth/signin');
+      }
+    };
+
+    checkAuth();
   }, [router]);
 
   useEffect(() => {
@@ -39,8 +66,10 @@ export default function Dashboard() {
       }
     };
 
-    fetchSeasons();
-  }, []);
+    if (!loading) {
+      fetchSeasons();
+    }
+  }, [loading]);
 
   const handleGameRecorded = () => {
     // Refresh the page to show updated rankings and game history
@@ -63,11 +92,26 @@ export default function Dashboard() {
         <div className="space-y-8">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            {currentSeason && (
-              <div className="text-lg text-gray-600">
-                {currentSeason.name}
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {currentSeason && (
+                <div className="text-lg text-gray-600">
+                  {currentSeason.name}
+                </div>
+              )}
+              <button
+                onClick={async () => {
+                  try {
+                    await signOut();
+                    router.push('/');
+                  } catch (error) {
+                    console.error('Error signing out:', error);
+                  }
+                }}
+                className="text-sm text-gray-600 hover:text-gray-900"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
 
           {currentSeason && (

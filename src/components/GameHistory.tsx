@@ -33,11 +33,13 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
       try {
         // Fetch games
         const gamesResponse = await fetch(`/api/seasons/${seasonId}/games`);
-        if (!gamesResponse.ok) {
-          throw new Error('Failed to fetch games');
-        }
         const gamesData = await gamesResponse.json();
-        setGames(Array.isArray(gamesData) ? gamesData : []);
+        
+        // Check if the response is an array (even if empty)
+        if (!Array.isArray(gamesData)) {
+          throw new Error('Invalid games data format');
+        }
+        setGames(gamesData);
 
         // Fetch users
         const usersResponse = await fetch('/api/users');
@@ -49,15 +51,21 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
           throw new Error('Invalid users data format');
         }
         setUsers(usersData);
+        setError(null);
       } catch (error) {
         console.error('Error fetching game history:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load game history');
+        // Don't set error for empty games, that's a valid state
+        if (error instanceof Error && !error.message.includes('Failed to fetch games')) {
+          setError(error.message);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    if (seasonId) {
+      fetchData();
+    }
   }, [seasonId]);
 
   const getUserName = (userId: string) => {
@@ -81,7 +89,7 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
     return (
       <div className="card space-y-4">
         <h3 className="text-xl font-semibold">Game History</h3>
-        <p className="text-gray-500">No games have been played yet.</p>
+        <p className="text-gray-500">No games have been played yet in this season.</p>
       </div>
     );
   }

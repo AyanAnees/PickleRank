@@ -1,78 +1,117 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// List of paths that don't require authentication
+// Define public paths that don't require authentication
 const publicPaths = [
   '/',
   '/auth/signin',
-  '/api/auth/signin',
+  '/terms',
+  '/privacy',
   '/api/auth/verify',
+  '/api/users/me'
+];
+
+// Define paths that require admin access
+const adminPaths = [
+  '/admin',
+  '/api/admin'
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  let response: NextResponse;
 
   // Allow public paths
   if (publicPaths.some(path => pathname.startsWith(path))) {
-    response = NextResponse.next();
-  } else {
-    // Check for authentication token
-    const token = request.cookies.get('auth-token')?.value;
+    return NextResponse.next();
+  }
 
-    if (!token) {
-      // Redirect to sign in page if no token
-      const url = new URL('/auth/signin', request.url);
-      url.searchParams.set('from', pathname);
-      return NextResponse.redirect(url);
-    }
+  // Check for auth token
+  const authToken = request.cookies.get('auth-token')?.value;
 
-    try {
-      // Verify the token by calling our API
-      const verifyResponse = await fetch(`${request.nextUrl.origin}/api/auth/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ idToken: token }),
-      });
+  // If no auth token and trying to access protected route, redirect to sign in
+  if (!authToken) {
+    const signInUrl = new URL('/auth/signin', request.url);
+    signInUrl.searchParams.set('from', pathname);
+    return NextResponse.redirect(signInUrl);
+  }
 
-      if (!verifyResponse.ok) {
-        throw new Error('Invalid token');
-      }
+  try {
+    // First verify the token
+    const verifyResponse = await fetch(`${request.nextUrl.origin}/api/auth/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ idToken: authToken }),
+    });
 
-      response = NextResponse.next();
-    } catch (error) {
+    if (!verifyResponse.ok) {
       // Clear invalid token and redirect to sign in
-      response = NextResponse.redirect(new URL('/auth/signin', request.url));
+      const response = NextResponse.redirect(new URL('/auth/signin', request.url));
       response.cookies.delete('auth-token');
       return response;
     }
+
+    // Then get user data
+    const userResponse = await fetch(`${request.nextUrl.origin}/api/users/me`, {
+      headers: {
+        'Cookie': `auth-token=${authToken}`
+      }
+    });
+
+    if (!userResponse.ok) {
+      // Clear invalid token and redirect to sign in
+      const response = NextResponse.redirect(new URL('/auth/signin', request.url));
+      response.cookies.delete('auth-token');
+      return response;
+    }
+
+    const userData = await userResponse.json();
+
+    // Check if registration is complete
+    if (!userData || !userData.firstName || !userData.lastName) {
+      // Clear token and redirect to sign in
+      const response = NextResponse.redirect(new URL('/auth/signin', request.url));
+      response.cookies.delete('auth-token');
+      return response;
+    }
+
+    // Check admin access for admin routes
+    if (adminPaths.some(path => pathname.startsWith(path)) && !userData.isAdmin) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    // All checks passed, allow access
+    const response = NextResponse.next();
+    
+    // Refresh the token in the cookie
+    response.cookies.set('auth-token', authToken, {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 1 week
+    });
+    
+    return response;
+  } catch (error) {
+    console.error('Middleware error:', error);
+    // Clear token and redirect to sign in on any error
+    const response = NextResponse.redirect(new URL('/auth/signin', request.url));
+    response.cookies.delete('auth-token');
+    return response;
   }
-
-  // Add CSP headers
-  response.headers.set(
-    'Content-Security-Policy',
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com/recaptcha/ https://www.recaptcha.net/ https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://www.googletagmanager.com/ https://www.google-analytics.com/ https://firebase.googleapis.com/ https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; " +
-    "frame-src 'self' https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; " +
-    "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: https:; " +
-    "connect-src 'self' https://identitytoolkit.googleapis.com/ https://securetoken.googleapis.com/ https://firestore.googleapis.com/ https://firebasestorage.googleapis.com/ https://firebase.googleapis.com/ https://www.google-analytics.com/ https://region1.google-analytics.com/ https://analytics.google.com/ https://*.firebase.googleapis.com/ https://*.firebaseio.com/ https://*.firebase.com/ https://www.google.com/recaptcha/ https://www.recaptcha.net/ https://www.gstatic.com/recaptcha/ https://recaptcha.google.com/recaptcha/;"
-  );
-
-  return response;
 }
 
 export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - public folder
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
   ],
 }; 

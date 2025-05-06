@@ -75,6 +75,8 @@ export async function confirmCode(verificationId: string, code: string): Promise
 export async function signOut(): Promise<void> {
   try {
     await firebaseSignOut(auth);
+    // Clear the auth token cookie
+    document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   } catch (error) {
     console.error('Error signing out:', error);
     throw error;
