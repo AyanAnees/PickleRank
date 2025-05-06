@@ -82,16 +82,11 @@ export default function Home() {
               <SeasonRankings seasonId={currentSeason.id} />
             </div>
           )}
-          <footer className="mt-8 text-center text-sm text-gray-500">
-            <p>© {new Date().getFullYear()} PickleRank. All rights reserved.</p>
-            <div className="mt-2 space-x-4">
-              <Link href="/terms" className="hover:text-indigo-600">
-                Terms of Service
-              </Link>
-              <Link href="/privacy" className="hover:text-indigo-600">
-                Privacy Policy
-              </Link>
-            </div>
+          <footer className="mt-8 text-center text-gray-500 text-sm">
+            <p>© PickleRank. All rights reserved.</p>
+            <Link href="/rankings-explained" className="text-indigo-600 hover:text-indigo-500 mt-2 inline-block">
+              How do rankings work?
+            </Link>
           </footer>
         </div>
       </div>
