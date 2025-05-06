@@ -18,11 +18,15 @@ export async function GET(
     );
 
     const snapshot = await getDocs(q);
-    const games = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt.toDate().toISOString(),
-    }));
+    const games = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+        gameTime: data.gameTime?.toDate?.()?.toISOString() || data.gameTime
+      };
+    });
 
     return NextResponse.json(games || []);
   } catch (error) {
