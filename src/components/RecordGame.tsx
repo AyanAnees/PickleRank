@@ -11,6 +11,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   // Form state
   const [team1Player1, setTeam1Player1] = useState('');
@@ -71,6 +72,17 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
     return true;
   };
 
+  const resetForm = () => {
+    setTeam1Player1('');
+    setTeam1Player2('');
+    setTeam2Player1('');
+    setTeam2Player2('');
+    setTeam1Score('');
+    setTeam2Score('');
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000); // Clear success message after 3 seconds
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -100,23 +112,20 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to record game');
+        throw new Error(data.error || 'Failed to record game');
       }
 
-      // Reset form
-      setTeam1Player1('');
-      setTeam1Player2('');
-      setTeam2Player1('');
-      setTeam2Player2('');
-      setTeam1Score('');
-      setTeam2Score('');
-
+      // Reset form and show success message
+      resetForm();
+      
       // Notify parent component
       onGameRecorded();
     } catch (error) {
       console.error('Error recording game:', error);
-      setError('Failed to record game. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to record game. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -136,6 +145,12 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
         </div>
       )}
 
+      {success && (
+        <div className="bg-green-50 border-l-4 border-green-400 p-4">
+          <p className="text-green-700">Game recorded successfully!</p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -146,6 +161,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 onChange={(e) => setTeam1Player1(e.target.value)}
                 className="input-field"
                 required
+                disabled={isSubmitting}
               >
                 <option value="">Select Player 1</option>
                 {players.map((player) => (
@@ -159,6 +175,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 onChange={(e) => setTeam1Player2(e.target.value)}
                 className="input-field"
                 required
+                disabled={isSubmitting}
               >
                 <option value="">Select Player 2</option>
                 {players.map((player) => (
@@ -175,6 +192,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 className="input-field"
                 min="0"
                 required
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -187,6 +205,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 onChange={(e) => setTeam2Player1(e.target.value)}
                 className="input-field"
                 required
+                disabled={isSubmitting}
               >
                 <option value="">Select Player 1</option>
                 {players.map((player) => (
@@ -200,6 +219,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 onChange={(e) => setTeam2Player2(e.target.value)}
                 className="input-field"
                 required
+                disabled={isSubmitting}
               >
                 <option value="">Select Player 2</option>
                 {players.map((player) => (
@@ -216,6 +236,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 className="input-field"
                 min="0"
                 required
+                disabled={isSubmitting}
               />
             </div>
           </div>

@@ -15,6 +15,7 @@ export interface User {
   seasonStats: {
     [seasonId: string]: SeasonStats;
   };
+  email: string;
 }
 
 export interface SeasonStats {
@@ -47,17 +48,22 @@ export interface Game {
   id: string;
   seasonId: string;
   team1: {
-    players: string[];
+    players: User[];
     score: number;
     elo: number;
   };
   team2: {
-    players: string[];
+    players: User[];
     score: number;
     elo: number;
   };
   eloChange: number;
-  createdAt: string;
+  createdAt: any; // Firestore Timestamp
+  gameTime: any; // Firestore Timestamp
+  recordedBy: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface GameResult {

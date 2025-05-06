@@ -16,6 +16,17 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'game' | 'rankings'>('game');
   const router = useRouter();
 
+  const fetchSeasons = async () => {
+    try {
+      const response = await fetch('/api/seasons');
+      const seasons = await response.json();
+      const activeSeason = seasons.find((season: Season) => season.isActive);
+      setCurrentSeason(activeSeason || null);
+    } catch (error) {
+      console.error('Error fetching seasons:', error);
+    }
+  };
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -55,25 +66,14 @@ export default function Dashboard() {
   }, [router]);
 
   useEffect(() => {
-    const fetchSeasons = async () => {
-      try {
-        const response = await fetch('/api/seasons');
-        const seasons = await response.json();
-        const activeSeason = seasons.find((season: Season) => season.isActive);
-        setCurrentSeason(activeSeason || null);
-      } catch (error) {
-        console.error('Error fetching seasons:', error);
-      }
-    };
-
     if (!loading) {
       fetchSeasons();
     }
   }, [loading]);
 
   const handleGameRecorded = () => {
-    // Refresh the page to show updated rankings and game history
-    window.location.reload();
+    // Instead of refreshing the page, just fetch the latest data
+    fetchSeasons();
   };
 
   if (loading) {

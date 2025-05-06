@@ -116,7 +116,7 @@ export async function getCurrentSeason(): Promise<Season | null> {
   }
 }
 
-export async function getSeasonRankings(seasonId: string): Promise<{ rankings: SeasonRanking[], users: User[] }> {
+export async function getSeasonRankings(seasonId: string): Promise<{ rankings: SeasonRanking[], users: User[], unranked: SeasonRanking[] }> {
   try {
     // Get rankings for the season
     const rankingsRef = collection(db, RANKINGS_COLLECTION);
@@ -126,7 +126,7 @@ export async function getSeasonRankings(seasonId: string): Promise<{ rankings: S
     );
 
     const rankingsSnapshot = await getDocs(rankingsQuery);
-    const rankings = rankingsSnapshot.docs.map(doc => {
+    const allRankings = rankingsSnapshot.docs.map(doc => {
       const data = doc.data();
       const gamesPlayed = data.wins + data.losses;
       return {
@@ -139,14 +139,18 @@ export async function getSeasonRankings(seasonId: string): Promise<{ rankings: S
       };
     }) as SeasonRanking[];
 
+    // Split into ranked and unranked players
+    const unranked = allRankings.filter(ranking => ranking.gamesPlayed < 5);
+    const rankings = allRankings.filter(ranking => ranking.gamesPlayed >= 5);
+
     // Sort rankings by ELO in descending order and assign ranks
     rankings.sort((a, b) => b.currentElo - a.currentElo);
     rankings.forEach((ranking, index) => {
       ranking.rank = index + 1;
     });
 
-    // Get users for the rankings
-    const userIds = [...new Set(rankings.map(r => r.userId))];
+    // Get users for both ranked and unranked players
+    const userIds = [...new Set([...rankings, ...unranked].map(r => r.userId))];
     const users: User[] = [];
 
     for (const userId of userIds) {
@@ -159,10 +163,10 @@ export async function getSeasonRankings(seasonId: string): Promise<{ rankings: S
       }
     }
 
-    return { rankings, users };
+    return { rankings, users, unranked };
   } catch (error) {
     console.error('Error fetching season rankings:', error);
-    return { rankings: [], users: [] };
+    return { rankings: [], users: [], unranked: [] };
   }
 }
 

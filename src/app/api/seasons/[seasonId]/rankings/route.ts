@@ -7,17 +7,18 @@ export async function GET(
 ) {
   try {
     const { seasonId } = params;
-    const { rankings, users } = await getSeasonRankings(seasonId);
+    const { rankings, users, unranked } = await getSeasonRankings(seasonId);
     
     // Return empty arrays if no rankings found
     return NextResponse.json({
       rankings: rankings || [],
-      users: users || []
+      users: users || [],
+      unranked: unranked || []
     });
   } catch (error) {
     console.error('Error fetching rankings:', error);
     return NextResponse.json(
-      { rankings: [], users: [], error: 'Failed to fetch rankings' },
+      { rankings: [], users: [], unranked: [], error: 'Failed to fetch rankings' },
       { status: 500 }
     );
   }

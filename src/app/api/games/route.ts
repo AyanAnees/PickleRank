@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDoc, doc, updateDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
 import { calculateEloChange } from '@/lib/elo';
+import { auth } from '@/lib/firebase';
 
 interface Team {
   players: string[];
@@ -16,10 +17,46 @@ export async function POST(request: Request) {
       team2: Team;
     };
 
+    // Get the current user
+    const user = auth.currentUser;
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User must be authenticated to record a game' },
+        { status: 401 }
+      );
+    }
+
     // Validate input
     if (!seasonId || !team1 || !team2) {
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Check for duplicate game submission (same teams and scores within last 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const gamesRef = collection(db, 'games');
+    const recentGamesQuery = query(
+      gamesRef,
+      where('seasonId', '==', seasonId),
+      where('createdAt', '>', Timestamp.fromDate(fiveMinutesAgo))
+    );
+    
+    const recentGames = await getDocs(recentGamesQuery);
+    const duplicateGame = recentGames.docs.find(doc => {
+      const game = doc.data();
+      return (
+        game.team1.players.sort().join(',') === team1.players.sort().join(',') &&
+        game.team2.players.sort().join(',') === team2.players.sort().join(',') &&
+        game.team1.score === team1.score &&
+        game.team2.score === team2.score
+      );
+    });
+
+    if (duplicateGame) {
+      return NextResponse.json(
+        { error: 'This game has already been recorded' },
         { status: 400 }
       );
     }
@@ -46,8 +83,11 @@ export async function POST(request: Request) {
     const team1Won = team1.score > team2.score;
     const eloChange = calculateEloChange(team1Elo, team2Elo, team1Won);
 
-    // Record the game
-    const gamesRef = collection(db, 'games');
+    // Get user data to include who recorded the game
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const userData = userDoc.data();
+
+    // Record the game with timestamp and recorded by info
     const gameDoc = await addDoc(gamesRef, {
       seasonId,
       team1: {
@@ -62,6 +102,11 @@ export async function POST(request: Request) {
       },
       eloChange,
       createdAt: Timestamp.now(),
+      recordedBy: {
+        id: user.uid,
+        name: userData?.displayName || 'Unknown User',
+      },
+      gameTime: Timestamp.now(), // This will be used for sorting and rematch detection
     });
 
     // Update player rankings
@@ -100,7 +145,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error recording game:', error);
     return NextResponse.json(
-      { error: 'Failed to record game' },
+      { error: 'Failed to record game. Please try again.' },
       { status: 500 }
     );
   }

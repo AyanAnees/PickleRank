@@ -1,22 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { User } from '../types';
-
-interface Game {
-  id: string;
-  seasonId: string;
-  team1: {
-    players: string[];
-    score: number;
-    elo: number;
-  };
-  team2: {
-    players: string[];
-    score: number;
-    elo: number;
-  };
-  eloChange: number;
-  createdAt: string;
-}
+import { Game } from '@/types';
+import { formatDistanceToNow } from 'date-fns';
 
 interface GameHistoryProps {
   seasonId: string;
@@ -99,30 +84,30 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
       <h3 className="text-xl font-semibold">Game History</h3>
       <div className="space-y-4">
         {games.map((game) => (
-          <div key={game.id} className="border rounded-lg p-4 space-y-2">
-            <div className="flex justify-between items-center">
-              <div className="space-y-1">
-                <p className="font-medium">
-                  {getUserName(game.team1.players[0])} & {getUserName(game.team1.players[1])}
-                </p>
-                <p className="text-sm text-gray-500">
-                  vs
-                </p>
-                <p className="font-medium">
-                  {getUserName(game.team2.players[0])} & {getUserName(game.team2.players[1])}
-                </p>
+          <div key={game.id} className="border rounded-lg p-4 bg-white shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">
+                      {game.team1.players.map(p => p.displayName).join(' & ')}
+                    </span>
+                    <span className="text-gray-500">vs</span>
+                    <span className="font-medium">
+                      {game.team2.players.map(p => p.displayName).join(' & ')}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {formatDistanceToNow(game.gameTime.toDate(), { addSuffix: true })}
+                  </div>
+                </div>
+                <div className="mt-1 text-sm text-gray-600">
+                  Score: {game.team1.score} - {game.team2.score}
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Recorded by {game.recordedBy.name}
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold">
-                  {game.team1.score} - {game.team2.score}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {new Date(game.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-            <div className="text-sm text-gray-500">
-              ELO Change: {game.eloChange > 0 ? '+' : ''}{game.eloChange}
             </div>
           </div>
         ))}
