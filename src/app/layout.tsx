@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '../contexts/AuthContext';
+import EloFooter from '../components/EloFooter';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -23,6 +24,7 @@ export default function RootLayout({
           <main className="max-w-md mx-auto px-4 py-8">
             {children}
           </main>
+          <EloFooter />
         </AuthProvider>
       </body>
     </html>
