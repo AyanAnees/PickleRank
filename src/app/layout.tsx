@@ -7,8 +7,11 @@ import { AuthProvider } from '../contexts/AuthContext';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'PickleRank - Track Your Pickleball Rankings',
-  description: 'A modern application for tracking and ranking pickleball players using an ELO rating system.',
+  title: 'PickleRank - Go PICKLEHEADS',
+  description: 'BEND IT LIKE SHAH',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
