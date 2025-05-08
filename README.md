@@ -53,4 +53,45 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests! 
+Feel free to submit issues and enhancement requests!
+
+## Project Goals & Requirements
+
+**PickleRank** is a fun, mobile-first app for tracking internal pickleball rankings among friends. Below are the current goals and requirements for the project:
+
+### Core Features
+- **Authentication:**
+  - Sign in with phone number and verification code.
+  - User account persists across devices.
+- **User Registration:**
+  - First-time users must provide first and last name.
+  - Returning users skip registration.
+- **Footer:**
+  - Present on all pages except the rankings explanation page.
+- **Game Entry:**
+  - Any user can enter game results, including teams and scores.
+  - Game entry displays teams, score, winner, date/time, and who entered it.
+- **Seasons:**
+  - Each season lasts 2 months.
+  - Rankings reset at the start of each season.
+  - Users can view past seasons' games and leaderboards.
+- **Admin Controls:**
+  - Admins can update or delete games.
+  - Admin status toggled via user ID.
+- **Elo System:**
+  - Elo recalculates if games are edited or deleted.
+  - Elo is only displayed after a player has played 5 games.
+- **Match History:**
+  - Show last 10 games by default, with "see more" to load additional history.
+- **Design:**
+  - User-friendly, intuitive, robust design (not over-engineered).
+  - Mobile-first UI using Tailwind CSS.
+- **Hosting & Backend:**
+  - Firebase Firestore backend.
+  - Hosted on Vercel.
+- **Database Tables:**
+  - Current: `games`, `seasons`, `users` (expandable as needed).
+
+---
+
+*For any future features or changes, please update this section to keep project goals clear for all contributors.* 
