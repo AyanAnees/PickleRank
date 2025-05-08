@@ -78,7 +78,8 @@ export default function SignIn() {
           'error-callback': () => {
             setRecaptchaCompleted(false);
             setError('reCAPTCHA error. Please try again.');
-          }
+          },
+          'invisible': false
         });
 
         recaptchaVerifierRef.current = verifier;
@@ -138,7 +139,8 @@ export default function SignIn() {
         'error-callback': () => {
           setRecaptchaCompleted(false);
           setError('reCAPTCHA error. Please try again.');
-        }
+        },
+        'invisible': false
       });
       recaptchaVerifierRef.current = verifier;
       verifier.render();
