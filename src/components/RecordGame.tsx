@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RecordGameProps {
   seasonId: string;
@@ -7,6 +8,7 @@ interface RecordGameProps {
 }
 
 export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps) {
+  const { user } = useAuth();
   const [players, setPlayers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,10 +90,30 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
     setError(null);
     setIsSubmitting(true);
 
+    if (!user?.uid) {
+      setError('You must be signed in to record a game.');
+      setIsSubmitting(false);
+      return;
+    }
+
     if (!validateTeams()) {
       setIsSubmitting(false);
       return;
     }
+
+    const payload = {
+      seasonId,
+      team1: {
+        players: [team1Player1, team1Player2],
+        score: parseInt(team1Score),
+      },
+      team2: {
+        players: [team2Player1, team2Player2],
+        score: parseInt(team2Score),
+      },
+      userId: user.uid,
+    };
+    console.log('Submitting game:', payload);
 
     try {
       const response = await fetch('/api/games', {
@@ -99,17 +121,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          seasonId,
-          team1: {
-            players: [team1Player1, team1Player2],
-            score: parseInt(team1Score),
-          },
-          team2: {
-            players: [team2Player1, team2Player2],
-            score: parseInt(team2Score),
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -245,7 +257,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
         <button
           type="submit"
           className="btn-primary w-full"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !user?.uid}
         >
           {isSubmitting ? 'Recording...' : 'Record Game'}
         </button>

@@ -8,27 +8,13 @@ import SeasonRankings from '../components/SeasonRankings';
 import RecordGame from '../components/RecordGame';
 import GameHistory from '../components/GameHistory';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 
 export default function Home() {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(!!user);
-      if (user) {
-        router.push('/dashboard');
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [router]);
 
   useEffect(() => {
     const fetchSeasons = async () => {
@@ -50,48 +36,35 @@ export default function Home() {
     window.location.reload();
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+  // Always show the sign-in page (no SSR auth check here)
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome Pickleheads</h1>
+          <p className="text-sm text-gray-500 mb-8">
+            Shoutout 24 hour shami
+          </p>
+          <button
+            onClick={() => router.push('/auth/signin')}
+            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Sign In
+          </button>
         </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full space-y-8 p-8">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome Pickleheads</h1>
-            <p className="text-sm text-gray-500 mb-8">
-              Shoutout 24 hour shami
-            </p>
-            <button
-              onClick={() => router.push('/auth/signin')}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Sign In
-            </button>
+        {currentSeason && (
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-4">Current Season Rankings</h2>
+            <SeasonRankings seasonId={currentSeason.id} />
           </div>
-          {currentSeason && (
-            <div className="mt-8">
-              <h2 className="text-xl font-semibold mb-4">Current Season Rankings</h2>
-              <SeasonRankings seasonId={currentSeason.id} />
-            </div>
-          )}
-          <footer className="mt-8 text-center text-gray-500 text-sm">
-            <p>© PickleRank. All rights reserved.</p>
-            <Link href="/rankings-explained" className="text-indigo-600 hover:text-indigo-500 mt-2 inline-block">
-              How do rankings work?
-            </Link>
-          </footer>
-        </div>
+        )}
+        <footer className="mt-8 text-center text-gray-500 text-sm">
+          <p>© PickleRank. All rights reserved.</p>
+          <Link href="/rankings-explained" className="text-indigo-600 hover:text-indigo-500 mt-2 inline-block">
+            How do rankings work?
+          </Link>
+        </footer>
       </div>
-    );
-  }
-
-  return null; // This should never be reached due to the redirect in useEffect
+    </div>
+  );
 } 

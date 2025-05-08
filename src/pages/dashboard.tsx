@@ -2,18 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import SeasonRankings from '@/components/SeasonRankings';
 import RecordGame from '@/components/RecordGame';
 import GameHistory from '@/components/GameHistory';
 import { Season } from '@/types';
-import { signOut } from '@/lib/auth';
+import { signOut } from '../client/auth';
 
 export default function Dashboard() {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'game' | 'rankings'>('game');
+  const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
 
   const fetchSeasons = async () => {
@@ -28,42 +27,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // First check if user is authenticated
-        const user = auth.currentUser;
-        if (!user) {
-          router.push('/auth/signin');
-          return;
-        }
-
-        // Then check if registration is complete
-        const response = await fetch('/api/users/me');
-        if (!response.ok) {
-          // If user data doesn't exist or there's an error, redirect to sign in
-          await signOut();
-          router.push('/auth/signin');
-          return;
-        }
-
-        const userData = await response.json();
-        if (!userData || !userData.firstName || !userData.lastName) {
-          // If registration is incomplete, redirect to sign in
-          await signOut();
-          router.push('/auth/signin');
-          return;
-        }
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error checking auth:', error);
-        await signOut();
-        router.push('/auth/signin');
-      }
-    };
-
-    checkAuth();
-  }, [router]);
+    // TODO: Move auth check to a client context or API route
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     if (!loading) {
@@ -74,6 +40,7 @@ export default function Dashboard() {
   const handleGameRecorded = () => {
     // Instead of refreshing the page, just fetch the latest data
     fetchSeasons();
+    setRefreshKey((k) => k + 1);
   };
 
   if (loading) {
@@ -171,7 +138,7 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-8">
-            <GameHistory seasonId={currentSeason?.id || ''} />
+            <GameHistory seasonId={currentSeason?.id || ''} refreshKey={refreshKey} />
           </div>
         </div>
       </div>

@@ -5,9 +5,10 @@ import { formatDistanceToNow, format } from 'date-fns';
 
 interface GameHistoryProps {
   seasonId: string;
+  refreshKey?: number;
 }
 
-export default function GameHistory({ seasonId }: GameHistoryProps) {
+export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) {
   const [games, setGames] = useState<Game[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +49,7 @@ export default function GameHistory({ seasonId }: GameHistoryProps) {
     };
 
     fetchGames();
-  }, [seasonId]);
+  }, [seasonId, refreshKey]);
 
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId);

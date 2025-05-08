@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase-admin';
 
 export async function DELETE(
   request: Request,
@@ -8,7 +7,7 @@ export async function DELETE(
 ) {
   try {
     const { seasonId } = params;
-    await deleteDoc(doc(db, 'seasons', seasonId));
+    await db.collection('seasons').doc(seasonId).delete();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting season:', error);

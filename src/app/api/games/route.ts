@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, getDoc, doc, updateDoc, Timestamp, query, where, getDocs, setDoc } from 'firebase/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { adminAuth, db } from '@/lib/firebase-admin';
 import { calculateEloChange } from '@/lib/elo';
-import { auth } from '@/lib/firebase';
 
 interface Team {
   players: string[];
@@ -11,23 +10,15 @@ interface Team {
 
 export async function POST(request: Request) {
   try {
-    const { seasonId, team1, team2 } = await request.json() as {
+    const { seasonId, team1, team2, userId } = await request.json() as {
       seasonId: string;
       team1: Team;
       team2: Team;
+      userId: string; // Pass userId from client (or use session in real app)
     };
 
-    // Get the current user
-    const user = auth.currentUser;
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User must be authenticated to record a game' },
-        { status: 401 }
-      );
-    }
-
     // Validate input
-    if (!seasonId || !team1 || !team2) {
+    if (!seasonId || !team1 || !team2 || !userId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -36,15 +27,12 @@ export async function POST(request: Request) {
 
     // Check for duplicate game submission (same teams and scores within last 5 minutes)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const gamesRef = collection(db, 'games');
-    const recentGamesQuery = query(
-      gamesRef,
-      where('seasonId', '==', seasonId),
-      where('createdAt', '>', Timestamp.fromDate(fiveMinutesAgo))
-    );
-    
-    const recentGames = await getDocs(recentGamesQuery);
-    const duplicateGame = recentGames.docs.find(doc => {
+    const gamesRef = db.collection('games');
+    const recentGamesQuery = gamesRef
+      .where('seasonId', '==', seasonId)
+      .where('createdAt', '>', Timestamp.fromDate(fiveMinutesAgo));
+    const recentGamesSnap = await recentGamesQuery.get();
+    const duplicateGame = recentGamesSnap.docs.find(doc => {
       const game = doc.data();
       return (
         game.team1.players.sort().join(',') === team1.players.sort().join(',') &&
@@ -53,7 +41,6 @@ export async function POST(request: Request) {
         game.team2.score === team2.score
       );
     });
-
     if (duplicateGame) {
       return NextResponse.json(
         { error: 'This game has already been recorded' },
@@ -62,18 +49,17 @@ export async function POST(request: Request) {
     }
 
     // Get current rankings for all players
-    const rankingsRef = collection(db, 'rankings');
-    const rankings = await Promise.all([
-      ...team1.players.map((playerId: string) => getDoc(doc(rankingsRef, `${seasonId}_${playerId}`))),
-      ...team2.players.map((playerId: string) => getDoc(doc(rankingsRef, `${seasonId}_${playerId}`)))
+    const rankingsRef = db.collection('rankings');
+    const rankingDocs = await Promise.all([
+      ...team1.players.map((playerId: string) => rankingsRef.doc(`${seasonId}_${playerId}`).get()),
+      ...team2.players.map((playerId: string) => rankingsRef.doc(`${seasonId}_${playerId}`).get())
     ]);
 
     // Initialize rankings for any players that don't have them yet
-    const initPromises = rankings.map(async (rankingDoc, index) => {
-      if (!rankingDoc.exists()) {
+    const initPromises = rankingDocs.map(async (rankingDoc, index) => {
+      if (!rankingDoc.exists) {
         const playerId = [...team1.players, ...team2.players][index];
-        const rankingRef = doc(rankingsRef, `${seasonId}_${playerId}`);
-        await setDoc(rankingRef, {
+        await rankingsRef.doc(`${seasonId}_${playerId}`).set({
           seasonId,
           userId: playerId,
           currentElo: 1500,
@@ -87,12 +73,11 @@ export async function POST(request: Request) {
     await Promise.all(initPromises);
 
     // Calculate average ELO for each team
-    const team1Elo = rankings.slice(0, 2).reduce((sum, doc) => {
+    const team1Elo = rankingDocs.slice(0, 2).reduce((sum, doc) => {
       const data = doc.data();
       return sum + (data?.currentElo || 1500);
     }, 0) / 2;
-
-    const team2Elo = rankings.slice(2).reduce((sum, doc) => {
+    const team2Elo = rankingDocs.slice(2).reduce((sum, doc) => {
       const data = doc.data();
       return sum + (data?.currentElo || 1500);
     }, 0) / 2;
@@ -102,11 +87,11 @@ export async function POST(request: Request) {
     const eloChange = calculateEloChange(team1Elo, team2Elo, team1Won);
 
     // Get user data to include who recorded the game
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const userDoc = await db.collection('users').doc(userId).get();
     const userData = userDoc.data();
 
     // Record the game with timestamp and recorded by info
-    const gameDoc = await addDoc(gamesRef, {
+    const gameDoc = await gamesRef.add({
       seasonId,
       team1: {
         players: team1.players,
@@ -121,20 +106,19 @@ export async function POST(request: Request) {
       eloChange,
       createdAt: Timestamp.now(),
       recordedBy: {
-        id: user.uid,
+        id: userId,
         name: userData?.displayName || 'Unknown User',
       },
-      gameTime: Timestamp.now(), // This will be used for sorting and rematch detection
+      gameTime: Timestamp.now(),
     });
 
     // Update player rankings
     const updatePromises = [
       ...team1.players.map((playerId: string) => {
-        const rankingRef = doc(rankingsRef, `${seasonId}_${playerId}`);
-        const ranking = rankings.find(doc => doc.id === `${seasonId}_${playerId}`);
+        const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
+        const ranking = rankingDocs.find(doc => doc.id === `${seasonId}_${playerId}`);
         const data = ranking?.data() || { currentElo: 1500, wins: 0, losses: 0 };
-        
-        return updateDoc(rankingRef, {
+        return rankingRef.update({
           currentElo: data.currentElo + (team1Won ? eloChange : -eloChange),
           wins: (data.wins || 0) + (team1Won ? 1 : 0),
           losses: (data.losses || 0) + (team1Won ? 0 : 1),
@@ -142,11 +126,10 @@ export async function POST(request: Request) {
         });
       }),
       ...team2.players.map((playerId: string) => {
-        const rankingRef = doc(rankingsRef, `${seasonId}_${playerId}`);
-        const ranking = rankings.find(doc => doc.id === `${seasonId}_${playerId}`);
+        const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
+        const ranking = rankingDocs.find(doc => doc.id === `${seasonId}_${playerId}`);
         const data = ranking?.data() || { currentElo: 1500, wins: 0, losses: 0 };
-        
-        return updateDoc(rankingRef, {
+        return rankingRef.update({
           currentElo: data.currentElo + (team1Won ? -eloChange : eloChange),
           wins: (data.wins || 0) + (team1Won ? 0 : 1),
           losses: (data.losses || 0) + (team1Won ? 1 : 0),
@@ -154,7 +137,6 @@ export async function POST(request: Request) {
         });
       }),
     ];
-
     await Promise.all(updatePromises);
 
     return NextResponse.json({ success: true, gameId: gameDoc.id });

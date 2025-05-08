@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, signInWithCredential } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { auth } from '../../client/firebase';
 
 export default function SignIn() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -18,115 +17,46 @@ export default function SignIn() {
   const [consent, setConsent] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
   const [recaptchaCompleted, setRecaptchaCompleted] = useState(false);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  const recaptchaVerifierRef = useRef<any>(null);
+  const authRef = useRef<any>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const from = searchParams.get('from') || '/';
+  const pathname = usePathname();
+  const from = searchParams ? searchParams.get('from') || '/' : '/';
 
   // Check if user is already registered
   useEffect(() => {
-    const checkUserRegistration = async () => {
+    authRef.current = auth;
+    (async () => {
       try {
-        const user = auth.currentUser;
+        const user = authRef.current.currentUser;
         if (user) {
-          // Get the ID token
           const idToken = await user.getIdToken();
-          
-          // Set the token in a cookie
           document.cookie = `auth-token=${idToken}; path=/`;
-
-          // Check registration status
           const response = await fetch('/api/users/me', {
-            headers: {
-              'Cookie': `auth-token=${idToken}`
-            }
+            headers: { 'Cookie': `auth-token=${idToken}` }
           });
-
           if (response.ok) {
             const userData = await response.json();
             if (userData && userData.firstName && userData.lastName) {
-              // User is already registered, redirect to dashboard
-              router.push('/dashboard');
+              if (pathname !== '/dashboard') {
+                router.push('/dashboard');
+              }
               return;
             }
           }
         }
       } catch (error) {
-        console.error('Error checking user registration:', error);
-        // Clear any existing auth token on error
         document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       }
-    };
-
-    checkUserRegistration();
-  }, [router]);
+    })();
+  }, [router, pathname]);
 
   useEffect(() => {
-    // Initialize reCAPTCHA
-    const initializeRecaptcha = () => {
-      try {
-        const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          size: 'normal',
-          callback: () => {
-            setRecaptchaCompleted(true);
-            setError(null);
-          },
-          'expired-callback': () => {
-            setRecaptchaCompleted(false);
-            setError('reCAPTCHA expired. Please verify again.');
-          },
-          'error-callback': () => {
-            setRecaptchaCompleted(false);
-            setError('reCAPTCHA error. Please try again.');
-          },
-          'invisible': false
-        });
-
-        recaptchaVerifierRef.current = verifier;
-        verifier.render();
-      } catch (error) {
-        console.error('Error initializing reCAPTCHA:', error);
-        setError('Error loading reCAPTCHA. Please refresh the page.');
-      }
-    };
-
-    // Check network connectivity
-    if (!navigator.onLine) {
-      setError('No internet connection. Please check your network and try again.');
-      return;
-    }
-
-    initializeRecaptcha();
-
-    // Cleanup function
-    return () => {
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-        recaptchaVerifierRef.current = null;
-      }
-    };
-  }, []);
-
-  // Add a retry button for reCAPTCHA
-  const handleRetryRecaptcha = () => {
-    setError(null);
-    const container = document.getElementById('recaptcha-container');
-    if (container) {
-      container.innerHTML = '';
-    }
-    if (recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current.clear();
-      recaptchaVerifierRef.current = null;
-    }
-
-    // Check network connectivity
-    if (!navigator.onLine) {
-      setError('No internet connection. Please check your network and try again.');
-      return;
-    }
-
-    try {
-      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+    authRef.current = auth;
+    (async () => {
+      const { RecaptchaVerifier } = await import('firebase/auth');
+      const verifier = new RecaptchaVerifier(authRef.current, 'recaptcha-container', {
         size: 'normal',
         callback: () => {
           setRecaptchaCompleted(true);
@@ -144,11 +74,14 @@ export default function SignIn() {
       });
       recaptchaVerifierRef.current = verifier;
       verifier.render();
-    } catch (error) {
-      console.error('Error initializing reCAPTCHA:', error);
-      setError('Error loading reCAPTCHA. Please refresh the page.');
-    }
-  };
+    })();
+    return () => {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+    };
+  }, []);
 
   const formatPhoneNumber = (value: string) => {
     // Remove all non-digit characters
@@ -177,48 +110,28 @@ export default function SignIn() {
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!recaptchaCompleted) {
       setError('Please complete the reCAPTCHA verification first');
       return;
     }
-
     setError(null);
     setLoading(true);
-
     try {
-      if (!recaptchaVerifierRef.current) {
-        throw new Error('reCAPTCHA not initialized');
-      }
-
+      if (!recaptchaVerifierRef.current) throw new Error('reCAPTCHA not initialized');
       const formattedPhone = formatPhoneNumber(phoneNumber);
-      if (!validatePhoneNumber(formattedPhone)) {
-        throw new Error('Please enter a valid phone number');
-      }
-
-      // Format phone number to E.164 format with US country code
+      if (!validatePhoneNumber(formattedPhone)) throw new Error('Please enter a valid phone number');
       const e164Phone = `+1${formattedPhone.replace(/\D/g, '')}`;
-
-      // Check network connectivity
-      if (!navigator.onLine) {
-        throw new Error('No internet connection. Please check your network and try again.');
+      if (!authRef.current) {
+        const { getAuth } = await import('firebase/auth');
+        authRef.current = getAuth();
       }
-
-      // Check if Firebase is available
-      if (!auth) {
-        throw new Error('Authentication service is not available. Please try again later.');
-      }
-
-      const confirmationResult = await signInWithPhoneNumber(auth, e164Phone, recaptchaVerifierRef.current);
+      const { signInWithPhoneNumber } = await import('firebase/auth');
+      const confirmationResult = await signInWithPhoneNumber(authRef.current, e164Phone, recaptchaVerifierRef.current);
       setVerificationId(confirmationResult.verificationId);
       setVerificationSent(true);
     } catch (err: any) {
-      console.error('Error sending code:', err);
-      
-      // Handle specific error cases
       if (err.code === 'auth/network-request-failed') {
         setError('Network error. Please check your internet connection and try again.');
-        // Clear any existing auth token
         document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       } else if (err.code === 'auth/invalid-phone-number') {
         setError('Invalid phone number format. Please check and try again.');
@@ -236,73 +149,41 @@ export default function SignIn() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
-      if (!verificationId) {
-        throw new Error('No verification ID found');
+      if (!verificationId) throw new Error('No verification ID found');
+      if (!authRef.current) {
+        const { getAuth } = await import('firebase/auth');
+        authRef.current = getAuth();
       }
-
-      // Check network connectivity
-      if (!navigator.onLine) {
-        throw new Error('No internet connection. Please check your network and try again.');
-      }
-
-      // Check if Firebase is available
-      if (!auth) {
-        throw new Error('Authentication service is not available. Please try again later.');
-      }
-
+      const { PhoneAuthProvider, signInWithCredential } = await import('firebase/auth');
       const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
-      const userCredential = await signInWithCredential(auth, credential);
-      
-      // Get the ID token
+      const userCredential = await signInWithCredential(authRef.current, credential);
       const idToken = await userCredential.user.getIdToken();
-      
-      // Set the token in a cookie immediately
       document.cookie = `auth-token=${idToken}; path=/`;
-
-      // Verify the token with our API
       const verifyResponse = await fetch('/api/auth/verify', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
       });
-
-      if (!verifyResponse.ok) {
-        throw new Error('Failed to verify token');
-      }
-
-      // Check if this is a new user or if registration is incomplete
+      if (!verifyResponse.ok) throw new Error('Failed to verify token');
       const response = await fetch('/api/users/me', {
-        headers: {
-          'Cookie': `auth-token=${idToken}`
-        }
+        headers: { 'Cookie': `auth-token=${idToken}` }
       });
-
       if (!response.ok) {
         setIsNewUser(true);
         return;
       }
-
       const userData = await response.json();
-      
-      // Check if registration is incomplete (no firstName or lastName)
       if (!userData || !userData.firstName || !userData.lastName) {
         setIsNewUser(true);
         return;
       }
-
-      // User is registered, redirect to dashboard
-      router.push('/dashboard');
+      if (pathname !== '/dashboard') {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
-      console.error('Error verifying code:', err);
-      
-      // Handle specific error cases
       if (err.code === 'auth/network-request-failed') {
         setError('Network error. Please check your internet connection and try again.');
-        // Clear any existing auth token
         document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       } else {
         setError('Invalid verification code. Please try again.');
@@ -316,27 +197,22 @@ export default function SignIn() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
       if (!consent) {
         setError('Please accept the Terms of Service and Privacy Policy to continue');
         setLoading(false);
         return;
       }
-
-      if (!auth.currentUser) {
-        throw new Error('No authenticated user found');
+      if (!authRef.current) {
+        const { getAuth } = await import('firebase/auth');
+        authRef.current = getAuth();
       }
-
-      // Get a fresh token
-      const idToken = await auth.currentUser.getIdToken(true);
-      
-      // Set the token in a cookie
+      if (!authRef.current.currentUser) throw new Error('No authenticated user found');
+      const idToken = await authRef.current.currentUser.getIdToken(true);
       document.cookie = `auth-token=${idToken}; path=/`;
-
       const userData = {
-        id: auth.currentUser.uid,
-        phoneNumber: auth.currentUser.phoneNumber || '',
+        id: authRef.current.currentUser.uid,
+        phoneNumber: authRef.current.currentUser.phoneNumber || '',
         displayName: `${firstName} ${lastName}`,
         firstName,
         lastName,
@@ -349,7 +225,6 @@ export default function SignIn() {
         isAdmin: false,
         seasonStats: {}
       };
-
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
@@ -358,22 +233,52 @@ export default function SignIn() {
         },
         body: JSON.stringify(userData),
       });
-
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to create account');
       }
-
-      // Registration successful, redirect to dashboard
-      router.push('/dashboard');
+      if (pathname !== '/dashboard') {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to create account');
-      console.error('Registration error:', err);
-      // Clear any existing auth token on error
       document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRetryRecaptcha = async () => {
+    setError(null);
+    const container = document.getElementById('recaptcha-container');
+    if (container) container.innerHTML = '';
+    if (recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current.clear();
+      recaptchaVerifierRef.current = null;
+    }
+    if (!authRef.current) {
+      const { getAuth } = await import('firebase/auth');
+      authRef.current = getAuth();
+    }
+    const { RecaptchaVerifier } = await import('firebase/auth');
+    const verifier = new RecaptchaVerifier(authRef.current, 'recaptcha-container', {
+      size: 'normal',
+      callback: () => {
+        setRecaptchaCompleted(true);
+        setError(null);
+      },
+      'expired-callback': () => {
+        setRecaptchaCompleted(false);
+        setError('reCAPTCHA expired. Please verify again.');
+      },
+      'error-callback': () => {
+        setRecaptchaCompleted(false);
+        setError('reCAPTCHA error. Please try again.');
+      },
+      'invisible': false
+    });
+    recaptchaVerifierRef.current = verifier;
+    verifier.render();
   };
 
   return (

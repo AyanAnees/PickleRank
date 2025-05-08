@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase-admin';
 
 export async function GET(
   request: Request,
@@ -10,29 +9,24 @@ export async function GET(
     const { seasonId } = params;
 
     // Query games for this season
-    const gamesRef = collection(db, 'games');
-    const q = query(
-      gamesRef,
-      where('seasonId', '==', seasonId),
-      orderBy('createdAt', 'desc')
-    );
-
-    const snapshot = await getDocs(q);
+    const gamesRef = db.collection('games');
+    const q = gamesRef.where('seasonId', '==', seasonId).orderBy('createdAt', 'desc');
+    const snapshot = await q.get();
     const games = await Promise.all(snapshot.docs.map(async (gameDoc) => {
       const data = gameDoc.data();
       
       // Get player information for both teams
       const team1Players = await Promise.all(
         data.team1.players.map(async (playerId: string) => {
-          const playerDoc = await getDoc(doc(db, 'users', playerId));
-          return playerDoc.exists() ? playerDoc.data() : { displayName: 'Unknown Player' };
+          const playerDoc = await db.collection('users').doc(playerId).get();
+          return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
         })
       );
 
       const team2Players = await Promise.all(
         data.team2.players.map(async (playerId: string) => {
-          const playerDoc = await getDoc(doc(db, 'users', playerId));
-          return playerDoc.exists() ? playerDoc.data() : { displayName: 'Unknown Player' };
+          const playerDoc = await db.collection('users').doc(playerId).get();
+          return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
         })
       );
 

@@ -1,5 +1,5 @@
-import { db } from './firebase';
-import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { db } from './firebase-admin';
 import { Season, SeasonRanking, User } from '../types';
 import { DEFAULT_SEASON_SETTINGS } from '../utils/season';
 
@@ -11,22 +11,17 @@ export async function createSeason(season: Omit<Season, 'id'>): Promise<Season |
   try {
     // Check for existing active seasons
     const now = new Date();
-    const seasonsRef = collection(db, SEASONS_COLLECTION);
-    const activeSeasonsQuery = query(
-      seasonsRef,
-      where('isActive', '==', true),
-      where('startDate', '<=', now),
-      where('endDate', '>=', now)
-    );
+    const seasonsRef = db.collection(SEASONS_COLLECTION);
+    const activeSeasonsQuery = db.collection(SEASONS_COLLECTION).where('isActive', '==', true).where('startDate', '<=', now).where('endDate', '>=', now);
     
-    const activeSeasons = await getDocs(activeSeasonsQuery);
+    const activeSeasons = await activeSeasonsQuery.get();
     if (!activeSeasons.empty) {
       console.error('Cannot create new season: An active season already exists');
       return null;
     }
 
-    const timestamp = Timestamp.now();
-    const docRef = await addDoc(seasonsRef, {
+    const timestamp = Timestamp.fromDate(new Date());
+    const docRef = await seasonsRef.add({
       ...season,
       startDate: Timestamp.fromDate(new Date(season.startDate)),
       endDate: Timestamp.fromDate(new Date(season.endDate)),
@@ -36,14 +31,17 @@ export async function createSeason(season: Omit<Season, 'id'>): Promise<Season |
     });
     
     // Get the created document to ensure we have all fields
-    const doc = await getDoc(docRef);
-    if (!doc.exists()) {
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
       return null;
     }
 
-    const data = doc.data();
+    const data = docSnap.data();
+    if (!data) {
+      return null;
+    }
     const newSeason = {
-      id: doc.id,
+      id: docSnap.id,
       name: data.name,
       startDate: data.startDate.toDate().toISOString(),
       endDate: data.endDate.toDate().toISOString(),
@@ -54,7 +52,7 @@ export async function createSeason(season: Omit<Season, 'id'>): Promise<Season |
     };
 
     // Initialize rankings for the new season
-    await initializeSeasonRankings(doc.id);
+    await initializeSeasonRankings(docSnap.id);
 
     return newSeason;
   } catch (error) {
@@ -65,9 +63,9 @@ export async function createSeason(season: Omit<Season, 'id'>): Promise<Season |
 
 export async function getSeasons(): Promise<Season[]> {
   try {
-    const seasonsRef = collection(db, SEASONS_COLLECTION);
-    const q = query(seasonsRef, orderBy('startDate', 'desc'));
-    const querySnapshot = await getDocs(q);
+    const seasonsRef = db.collection(SEASONS_COLLECTION);
+    const q = seasonsRef.orderBy('startDate', 'desc');
+    const querySnapshot = await q.get();
     
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
@@ -92,15 +90,10 @@ export async function getSeasons(): Promise<Season[]> {
 export async function getCurrentSeason(): Promise<Season | null> {
   try {
     const now = new Date();
-    const seasonsRef = collection(db, SEASONS_COLLECTION);
-    const q = query(
-      seasonsRef,
-      where('startDate', '<=', now),
-      where('endDate', '>=', now),
-      orderBy('startDate', 'desc')
-    );
+    const seasonsRef = db.collection(SEASONS_COLLECTION);
+    const q = seasonsRef.where('startDate', '<=', now).where('endDate', '>=', now).orderBy('startDate', 'desc');
     
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await q.get();
     if (querySnapshot.empty) {
       return null;
     }
@@ -119,13 +112,10 @@ export async function getCurrentSeason(): Promise<Season | null> {
 export async function getSeasonRankings(seasonId: string): Promise<{ rankings: SeasonRanking[], users: User[], unranked: SeasonRanking[] }> {
   try {
     // Get rankings for the season
-    const rankingsRef = collection(db, RANKINGS_COLLECTION);
-    const rankingsQuery = query(
-      rankingsRef,
-      where('seasonId', '==', seasonId)
-    );
+    const rankingsRef = db.collection(RANKINGS_COLLECTION);
+    const rankingsQuery = rankingsRef.where('seasonId', '==', seasonId);
 
-    const rankingsSnapshot = await getDocs(rankingsQuery);
+    const rankingsSnapshot = await rankingsQuery.get();
     const allRankings = rankingsSnapshot.docs.map(doc => {
       const data = doc.data();
       const gamesPlayed = (data.wins || 0) + (data.losses || 0);
@@ -154,8 +144,8 @@ export async function getSeasonRankings(seasonId: string): Promise<{ rankings: S
     const users: User[] = [];
 
     for (const userId of userIds) {
-      const userDoc = await getDoc(doc(db, USERS_COLLECTION, userId));
-      if (userDoc.exists()) {
+      const userDoc = await db.collection(USERS_COLLECTION).doc(userId).get();
+      if (userDoc.exists) {
         users.push({
           id: userDoc.id,
           ...userDoc.data()
@@ -177,28 +167,30 @@ export async function updatePlayerRanking(
   wins: number,
   losses: number
 ): Promise<SeasonRanking> {
-  const rankingRef = doc(db, RANKINGS_COLLECTION, `${seasonId}_${userId}`);
-  const rankingDoc = await getDoc(rankingRef);
+  const rankingRef = db.collection(RANKINGS_COLLECTION).doc(`${seasonId}_${userId}`);
+  const rankingDoc = await rankingRef.get();
 
-  if (rankingDoc.exists()) {
+  if (rankingDoc.exists) {
     // Update existing ranking
     const currentData = rankingDoc.data();
-    await updateDoc(rankingRef, {
+    const prevWins = currentData?.wins ?? 0;
+    const prevLosses = currentData?.losses ?? 0;
+    await rankingRef.update({
       currentElo,
-      wins: currentData.wins + wins,
-      losses: currentData.losses + losses,
-      updatedAt: Timestamp.now()
+      wins: prevWins + wins,
+      losses: prevLosses + losses,
+      updatedAt: Timestamp.fromDate(new Date())
     });
   } else {
     // Create new ranking
-    await setDoc(rankingRef, {
+    await rankingRef.set({
       seasonId,
       userId,
       currentElo,
       wins,
       losses,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
+      createdAt: Timestamp.fromDate(new Date()),
+      updatedAt: Timestamp.fromDate(new Date())
     });
   }
 
@@ -215,11 +207,11 @@ export async function updatePlayerRanking(
 
 export async function deleteAllSeasons(): Promise<void> {
   try {
-    const seasonsRef = collection(db, SEASONS_COLLECTION);
-    const querySnapshot = await getDocs(seasonsRef);
+    const seasonsRef = db.collection(SEASONS_COLLECTION);
+    const querySnapshot = await seasonsRef.get();
     
     const deletePromises = querySnapshot.docs.map(doc => 
-      deleteDoc(doc.ref)
+      doc.ref.delete()
     );
     
     await Promise.all(deletePromises);
@@ -231,22 +223,22 @@ export async function deleteAllSeasons(): Promise<void> {
 export async function initializeSeasonRankings(seasonId: string): Promise<void> {
   try {
     // Get all users
-    const usersRef = collection(db, USERS_COLLECTION);
-    const usersSnapshot = await getDocs(usersRef);
+    const usersRef = db.collection(USERS_COLLECTION);
+    const usersSnapshot = await usersRef.get();
     
     // Create initial rankings for each user
     const rankingPromises = usersSnapshot.docs.map(async (userDoc) => {
       const userData = userDoc.data();
-      const rankingRef = doc(db, RANKINGS_COLLECTION, `${seasonId}_${userDoc.id}`);
+      const rankingRef = db.collection(RANKINGS_COLLECTION).doc(`${seasonId}_${userDoc.id}`);
       
-      await setDoc(rankingRef, {
+      await rankingRef.set({
         seasonId,
         userId: userDoc.id,
         currentElo: userData.eloRating || 1500, // Default ELO if not set
         wins: 0,
         losses: 0,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
+        createdAt: Timestamp.fromDate(new Date()),
+        updatedAt: Timestamp.fromDate(new Date())
       });
     });
     

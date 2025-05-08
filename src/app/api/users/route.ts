@@ -1,26 +1,22 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-admin';
 import { User } from '@/types';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { collection, getDocs } from 'firebase/firestore';
 
 export async function POST(request: Request) {
   try {
     const userData: User = await request.json();
-    
-    // Check if user already exists
-    const userRef = doc(db, 'users', userData.id);
-    const userDoc = await getDoc(userRef);
+    const userRef = db.collection('users').doc(userData.id);
+    const userDoc = await userRef.get();
 
-    if (userDoc.exists()) {
+    if (userDoc.exists) {
       // Update existing user
-      await setDoc(userRef, {
+      await userRef.set({
         ...userData,
         updatedAt: new Date()
       }, { merge: true });
     } else {
       // Create new user
-      await setDoc(userRef, {
+      await userRef.set({
         ...userData,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -44,10 +40,10 @@ export async function GET(request: Request) {
 
     if (userId) {
       // Fetch single user
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
+      const userRef = db.collection('users').doc(userId);
+      const userDoc = await userRef.get();
 
-      if (!userDoc.exists()) {
+      if (!userDoc.exists) {
         return NextResponse.json(
           { error: 'User not found' },
           { status: 404 }
@@ -57,8 +53,8 @@ export async function GET(request: Request) {
       return NextResponse.json(userDoc.data());
     } else {
       // Fetch all users
-      const usersRef = collection(db, 'users');
-      const snapshot = await getDocs(usersRef);
+      const usersRef = db.collection('users');
+      const snapshot = await usersRef.get();
       const users = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
