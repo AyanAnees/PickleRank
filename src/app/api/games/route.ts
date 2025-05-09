@@ -177,6 +177,9 @@ export async function DELETE(request: Request, { params }: { params: { gameId: s
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
     const game = gameDoc.data();
+    if (!game) {
+      return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+    }
     const seasonId = game.seasonId;
     // Delete the game
     await gameDoc.ref.delete();
@@ -201,6 +204,9 @@ export async function PUT(request: Request, { params }: { params: { gameId: stri
     // Get the updated game to find seasonId
     const gameDoc = await db.collection('games').doc(gameId).get();
     const game = gameDoc.data();
+    if (!game) {
+      return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+    }
     const seasonId = game.seasonId;
     // Recalculate ELO for the season
     await recalculateSeasonElo(seasonId);
@@ -225,8 +231,8 @@ async function recalculateSeasonElo(seasonId: string) {
     gameTime: any;
   };
   const games: GameDoc[] = gamesSnap.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter((g): g is GameDoc => g && g.team1 && g.team2 && Array.isArray(g.team1.players) && Array.isArray(g.team2.players));
+    .map(doc => ({ id: doc.id, ...doc.data() }) as Partial<GameDoc>)
+    .filter((g): g is GameDoc => !!g && typeof g.team1 === 'object' && typeof g.team2 === 'object' && Array.isArray(g.team1.players) && Array.isArray(g.team2.players));
   // Get all player IDs
   const playerIds = new Set<string>();
   games.forEach(game => {
