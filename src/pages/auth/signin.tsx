@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { auth } from '../../client/firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber, signInWithCredential, PhoneAuthProvider } from 'firebase/auth';
 
 export default function SignIn() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -18,7 +19,6 @@ export default function SignIn() {
   const [verificationSent, setVerificationSent] = useState(false);
   const [recaptchaCompleted, setRecaptchaCompleted] = useState(false);
   const recaptchaVerifierRef = useRef<any>(null);
-  const authRef = useRef<any>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -26,10 +26,9 @@ export default function SignIn() {
 
   // Check if user is already registered
   useEffect(() => {
-    authRef.current = auth;
     (async () => {
       try {
-        const user = authRef.current.currentUser;
+        const user = auth.currentUser;
         if (user) {
           const idToken = await user.getIdToken();
           document.cookie = `auth-token=${idToken}; path=/`;
@@ -53,10 +52,13 @@ export default function SignIn() {
   }, [router, pathname]);
 
   useEffect(() => {
-    authRef.current = auth;
-    (async () => {
-      const { RecaptchaVerifier } = await import('firebase/auth');
-      const verifier = new RecaptchaVerifier(authRef.current, 'recaptcha-container', {
+    // Only initialize once
+    if (recaptchaVerifierRef.current) return;
+    if (!document.getElementById('recaptcha-container')) return;
+    const verifier = new RecaptchaVerifier(
+      auth,
+      'recaptcha-container',
+      {
         size: 'normal',
         callback: () => {
           setRecaptchaCompleted(true);
@@ -69,12 +71,11 @@ export default function SignIn() {
         'error-callback': () => {
           setRecaptchaCompleted(false);
           setError('reCAPTCHA error. Please try again.');
-        },
-        'invisible': false
-      });
-      recaptchaVerifierRef.current = verifier;
-      verifier.render();
-    })();
+        }
+      }
+    );
+    recaptchaVerifierRef.current = verifier;
+    verifier.render();
     return () => {
       if (recaptchaVerifierRef.current) {
         recaptchaVerifierRef.current.clear();
@@ -121,12 +122,7 @@ export default function SignIn() {
       const formattedPhone = formatPhoneNumber(phoneNumber);
       if (!validatePhoneNumber(formattedPhone)) throw new Error('Please enter a valid phone number');
       const e164Phone = `+1${formattedPhone.replace(/\D/g, '')}`;
-      if (!authRef.current) {
-        const { getAuth } = await import('firebase/auth');
-        authRef.current = getAuth();
-      }
-      const { signInWithPhoneNumber } = await import('firebase/auth');
-      const confirmationResult = await signInWithPhoneNumber(authRef.current, e164Phone, recaptchaVerifierRef.current);
+      const confirmationResult = await signInWithPhoneNumber(auth, e164Phone, recaptchaVerifierRef.current);
       setVerificationId(confirmationResult.verificationId);
       setVerificationSent(true);
     } catch (err: any) {
@@ -151,13 +147,8 @@ export default function SignIn() {
     setLoading(true);
     try {
       if (!verificationId) throw new Error('No verification ID found');
-      if (!authRef.current) {
-        const { getAuth } = await import('firebase/auth');
-        authRef.current = getAuth();
-      }
-      const { PhoneAuthProvider, signInWithCredential } = await import('firebase/auth');
       const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
-      const userCredential = await signInWithCredential(authRef.current, credential);
+      const userCredential = await signInWithCredential(auth, credential);
       const idToken = await userCredential.user.getIdToken();
       document.cookie = `auth-token=${idToken}; path=/`;
       const verifyResponse = await fetch('/api/auth/verify', {
@@ -203,16 +194,12 @@ export default function SignIn() {
         setLoading(false);
         return;
       }
-      if (!authRef.current) {
-        const { getAuth } = await import('firebase/auth');
-        authRef.current = getAuth();
-      }
-      if (!authRef.current.currentUser) throw new Error('No authenticated user found');
-      const idToken = await authRef.current.currentUser.getIdToken(true);
+      if (!auth.currentUser) throw new Error('No authenticated user found');
+      const idToken = await auth.currentUser.getIdToken(true);
       document.cookie = `auth-token=${idToken}; path=/`;
       const userData = {
-        id: authRef.current.currentUser.uid,
-        phoneNumber: authRef.current.currentUser.phoneNumber || '',
+        id: auth.currentUser.uid,
+        phoneNumber: auth.currentUser.phoneNumber || '',
         displayName: `${firstName} ${lastName}`,
         firstName,
         lastName,
@@ -248,39 +235,6 @@ export default function SignIn() {
     }
   };
 
-  const handleRetryRecaptcha = async () => {
-    setError(null);
-    const container = document.getElementById('recaptcha-container');
-    if (container) container.innerHTML = '';
-    if (recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current.clear();
-      recaptchaVerifierRef.current = null;
-    }
-    if (!authRef.current) {
-      const { getAuth } = await import('firebase/auth');
-      authRef.current = getAuth();
-    }
-    const { RecaptchaVerifier } = await import('firebase/auth');
-    const verifier = new RecaptchaVerifier(authRef.current, 'recaptcha-container', {
-      size: 'normal',
-      callback: () => {
-        setRecaptchaCompleted(true);
-        setError(null);
-      },
-      'expired-callback': () => {
-        setRecaptchaCompleted(false);
-        setError('reCAPTCHA expired. Please verify again.');
-      },
-      'error-callback': () => {
-        setRecaptchaCompleted(false);
-        setError('reCAPTCHA error. Please try again.');
-      },
-      'invisible': false
-    });
-    recaptchaVerifierRef.current = verifier;
-    verifier.render();
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -290,7 +244,7 @@ export default function SignIn() {
           </h2>
         </div>
 
-        {error && !error.includes('reCAPTCHA') && (
+        {error && (
           <div className="bg-red-50 border-l-4 border-red-400 p-4">
             <p className="text-red-700">{error}</p>
           </div>
@@ -325,33 +279,12 @@ export default function SignIn() {
               </div>
             </div>
 
-            <div className="flex justify-center min-h-[78px] bg-white rounded-lg shadow-sm p-2">
-              <div id="recaptcha-container" className="transform scale-100"></div>
-            </div>
-            
-            {error && error.includes('reCAPTCHA') && !isNewUser && (
-              <div className="flex flex-col items-center space-y-2">
-                <p className="text-sm text-red-500 text-center">{error}</p>
-                <button
-                  type="button"
-                  onClick={handleRetryRecaptcha}
-                  className="text-sm text-indigo-600 hover:text-indigo-500"
-                >
-                  Retry reCAPTCHA
-                </button>
-              </div>
-            )}
-            
-            {!error && !recaptchaCompleted && !isNewUser && (
-              <p className="text-sm text-gray-500 text-center">
-                Check the box above to verify you're human
-              </p>
-            )}
+            <div id="recaptcha-container" style={{ minHeight: 78 }} />
 
             <div>
               <button
                 type="submit"
-                disabled={loading || !validatePhoneNumber(phoneNumber) || !recaptchaCompleted || !navigator.onLine}
+                disabled={loading || !validatePhoneNumber(phoneNumber) || !navigator.onLine}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
                 {loading ? 'Sending...' : 'Send Code'}
