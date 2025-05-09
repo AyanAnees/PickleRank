@@ -80,12 +80,23 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
       <div className="space-y-2">
         {rankings.map((ranking, index) => {
           const user = users.find(u => u.id === ranking.userId);
+          let medal = null;
+          if (index === 0) {
+            medal = <span title="#1" className="ml-2 text-2xl">🥇</span>;
+          } else if (index === 1) {
+            medal = <span title="#2" className="ml-2 text-2xl">🥈</span>;
+          } else if (index === 2) {
+            medal = <span title="#3" className="ml-2 text-2xl">🥉</span>;
+          }
           return (
             <div key={ranking.userId} className="flex items-center justify-between p-2 bg-white rounded shadow">
               <div className="flex items-center space-x-4">
                 <span className="text-lg font-semibold text-gray-600">#{index + 1}</span>
-                <div>
+                <div className="flex items-center">
                   <span className="font-medium">{user?.displayName || 'Unknown Player'}</span>
+                  {medal}
+                </div>
+                <div className="ml-4">
                   <div className="text-sm text-gray-500">
                     Games: {ranking.gamesPlayed}/5
                   </div>

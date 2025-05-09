@@ -138,18 +138,22 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
       <div className="space-y-4">
         {games.map((game) => {
           const gameTime = formatGameTime(game.gameTime);
+          const team1Won = game.team1.score > game.team2.score;
+          const team2Won = game.team2.score > game.team1.score;
           return (
             <div key={game.id} className="border rounded-lg p-4 bg-white shadow-sm">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="font-medium">
+                      <span className={team1Won ? 'font-bold text-green-700 flex items-center' : 'font-medium'}>
                         {game.team1.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
+                        {team1Won && <span className="ml-2" title="Winner">🏆<span className="ml-1 text-xs font-semibold">Winner</span></span>}
                       </span>
                       <span className="text-gray-500">vs</span>
-                      <span className="font-medium">
+                      <span className={team2Won ? 'font-bold text-green-700 flex items-center' : 'font-medium'}>
                         {game.team2.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
+                        {team2Won && <span className="ml-2" title="Winner">🏆<span className="ml-1 text-xs font-semibold">Winner</span></span>}
                       </span>
                     </div>
                     {gameTime && (

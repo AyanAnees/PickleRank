@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     });
     if (duplicateGame) {
       return NextResponse.json(
-        { error: 'This game has already been recorded' },
+        { error: 'A game with the same teams and scores was recorded in the last 5 minutes. Please wait before submitting again.' },
         { status: 400 }
       );
     }
