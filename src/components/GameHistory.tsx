@@ -8,11 +8,23 @@ interface GameHistoryProps {
   refreshKey?: number;
 }
 
+// TODO: Replace with real user context
+const ADMIN_PHONES = ['+15856831831', '+15856831234'];
+function isAdmin() {
+  // Replace with real auth context
+  if (typeof window !== 'undefined') {
+    const userPhone = window.localStorage.getItem('phoneNumber');
+    return ADMIN_PHONES.includes(userPhone || '');
+  }
+  return false;
+}
+
 export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) {
   const [games, setGames] = useState<Game[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -49,7 +61,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
     };
 
     fetchGames();
-  }, [seasonId, refreshKey]);
+  }, [seasonId, refreshKey, refresh]);
 
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId);
@@ -67,6 +79,36 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
     } catch (e) {
       return null;
     }
+  };
+
+  const handleDelete = async (gameId: string) => {
+    if (!window.confirm('Are you sure you want to delete this game?')) return;
+    const token = window.localStorage.getItem('authToken');
+    const res = await fetch(`/api/games/${gameId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) setRefresh(r => r + 1);
+    else alert('Failed to delete game');
+  };
+
+  const handleEdit = async (game: any) => {
+    const token = window.localStorage.getItem('authToken');
+    const newScore1 = window.prompt('New score for Team 1?', game.team1.score);
+    const newScore2 = window.prompt('New score for Team 2?', game.team2.score);
+    if (newScore1 === null || newScore2 === null) return;
+    const updatedTeam1 = { ...game.team1, score: parseInt(newScore1, 10) };
+    const updatedTeam2 = { ...game.team2, score: parseInt(newScore2, 10) };
+    const res = await fetch(`/api/games/${game.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        team1: updatedTeam1,
+        team2: updatedTeam2,
+      }),
+    });
+    if (res.ok) setRefresh(r => r + 1);
+    else alert('Failed to edit game');
   };
 
   if (loading) {
@@ -126,6 +168,12 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                     </div>
                   )}
                 </div>
+                {isAdmin() && (
+                  <div className="flex flex-col gap-2 ml-4">
+                    <button className="text-xs text-blue-600 hover:underline" onClick={() => handleEdit(game)}>Edit</button>
+                    <button className="text-xs text-red-600 hover:underline" onClick={() => handleDelete(game.id)}>Delete</button>
+                  </div>
+                )}
               </div>
             </div>
           );

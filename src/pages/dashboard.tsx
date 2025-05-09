@@ -10,17 +10,30 @@ import { signOut } from '../client/auth';
 
 export default function Dashboard() {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'game' | 'rankings'>('game');
   const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
 
+  // TODO: Replace with real user context
+  const user = {
+    phoneNumber: '+15856831831', // Replace with actual user phone number from auth context
+    isAdmin: false,
+  };
+  if (user.phoneNumber === '+15856831831') {
+    user.isAdmin = true;
+  }
+
   const fetchSeasons = async () => {
     try {
       const response = await fetch('/api/seasons');
       const seasons = await response.json();
+      setSeasons(seasons);
       const activeSeason = seasons.find((season: Season) => season.isActive);
       setCurrentSeason(activeSeason || null);
+      setSelectedSeasonId((prev) => prev || (activeSeason ? activeSeason.id : (seasons[0]?.id || '')));
     } catch (error) {
       console.error('Error fetching seasons:', error);
     }
@@ -81,6 +94,25 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Season Selector */}
+          {seasons.length > 0 && (
+            <div className="mb-4">
+              <label htmlFor="season-select" className="block text-sm font-medium text-gray-700 mb-1">Select Season</label>
+              <select
+                id="season-select"
+                className="input-field w-full max-w-xs"
+                value={selectedSeasonId}
+                onChange={e => setSelectedSeasonId(e.target.value)}
+              >
+                {seasons.map(season => (
+                  <option key={season.id} value={season.id}>
+                    {season.name} ({new Date(season.startDate).toLocaleDateString()} - {new Date(season.endDate).toLocaleDateString()})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {currentSeason && (
             <>
               {(() => {
@@ -103,43 +135,47 @@ export default function Dashboard() {
             </>
           )}
 
-          <div className="bg-white rounded-lg shadow">
-            <div className="border-b border-gray-200">
-              <nav className="flex -mb-px">
-                <button
-                  onClick={() => setActiveTab('game')}
-                  className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                    activeTab === 'game'
-                      ? 'border-indigo-500 text-indigo-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Enter Game
-                </button>
-                <button
-                  onClick={() => setActiveTab('rankings')}
-                  className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
-                    activeTab === 'rankings'
-                      ? 'border-indigo-500 text-indigo-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Current Rankings
-                </button>
-              </nav>
+          {selectedSeasonId && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="border-b border-gray-200">
+                <nav className="flex -mb-px">
+                  <button
+                    onClick={() => setActiveTab('game')}
+                    className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                      activeTab === 'game'
+                        ? 'border-indigo-500 text-indigo-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Enter Game
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('rankings')}
+                    className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                      activeTab === 'rankings'
+                        ? 'border-indigo-500 text-indigo-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Current Rankings
+                  </button>
+                </nav>
+              </div>
+              <div className="p-6">
+                {activeTab === 'game' ? (
+                  <RecordGame seasonId={selectedSeasonId} onGameRecorded={handleGameRecorded} />
+                ) : (
+                  <SeasonRankings seasonId={selectedSeasonId} />
+                )}
+              </div>
             </div>
-            <div className="p-6">
-              {activeTab === 'game' ? (
-                <RecordGame seasonId={currentSeason?.id || ''} onGameRecorded={handleGameRecorded} />
-              ) : (
-                <SeasonRankings seasonId={currentSeason?.id || ''} />
-              )}
-            </div>
-          </div>
+          )}
 
-          <div className="mt-8">
-            <GameHistory seasonId={currentSeason?.id || ''} refreshKey={refreshKey} />
-          </div>
+          {selectedSeasonId && (
+            <div className="mt-8">
+              <GameHistory seasonId={selectedSeasonId} refreshKey={refreshKey} />
+            </div>
+          )}
         </div>
       </div>
     </div>
