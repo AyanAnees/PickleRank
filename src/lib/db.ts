@@ -153,7 +153,27 @@ export async function getSeasonRankings(seasonId: string): Promise<{ rankings: S
       }
     }
 
-    return { rankings, users, unranked };
+    // --- NEW LOGIC: include all users as unranked if they have no ranking doc ---
+    // Fetch all users in the system
+    const allUsersSnapshot = await db.collection(USERS_COLLECTION).get();
+    const allUsers = allUsersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+    const rankedUserIds = allRankings.map(r => r.userId);
+    const trulyUnrankedUsers = allUsers.filter(u => !rankedUserIds.includes(u.id));
+    const trulyUnranked = trulyUnrankedUsers.map(u => ({
+      userId: u.id,
+      seasonId,
+      currentElo: 1500,
+      gamesPlayed: 0,
+      winRate: 0,
+      rank: 0,
+    }));
+    // Add these to the unranked array
+    const allUnranked = [
+      ...unranked,
+      ...trulyUnranked,
+    ];
+
+    return { rankings, users: allUsers, unranked: allUnranked };
   } catch (error) {
     console.error('Error fetching season rankings:', error);
     return { rankings: [], users: [], unranked: [] };

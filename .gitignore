@@ -45,3 +45,4 @@ firebase-debug.*.log
 # Logs
 logs
 *.log 
+serviceAccountKey.json
