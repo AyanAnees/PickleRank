@@ -8,9 +8,27 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'PickleRank - Go PICKLEHEADS',
-  description: 'BEND IT LIKE SHAH',
+  description: 'Do it to em Dib',
   icons: {
     icon: '/favicon.ico',
+  },
+  openGraph: {
+    title: 'PickleRank - Go PICKLEHEADS',
+    description: 'Shaheer is not here is he',
+    images: [
+      {
+        url: '/favicon.ico',
+        width: 512,
+        height: 512,
+        alt: 'PickleRank',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PickleRank - Go PICKLEHEADS',
+    description: 'Cypress boyyyyyssss',
+    images: ['/favicon.ico'],
   },
 };
 
