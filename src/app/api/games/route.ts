@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       seasonId: string;
       team1: Team;
       team2: Team;
-      userId: string; // Pass userId from client (or use session in real app)
+      userId: string;
     };
 
     // Validate input
@@ -42,7 +42,96 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check for duplicate game submission (same teams and scores within last 5 minutes)
+    // Validate season exists and is active
+    const seasonDoc = await db.collection('seasons').doc(seasonId).get();
+    if (!seasonDoc.exists) {
+      return NextResponse.json(
+        { error: 'Season does not exist' },
+        { status: 400 }
+      );
+    }
+    const seasonData = seasonDoc.data();
+    if (!seasonData?.isActive) {
+      return NextResponse.json(
+        { error: 'Season is not active' },
+        { status: 400 }
+      );
+    }
+
+    // Validate all players exist and are active
+    const allPlayers = [...team1.players, ...team2.players];
+    const uniquePlayers = new Set(allPlayers);
+    if (uniquePlayers.size !== 4) {
+      return NextResponse.json(
+        { error: 'Each player can only play once per game' },
+        { status: 400 }
+      );
+    }
+
+    const playerDocs = await Promise.all(
+      allPlayers.map(playerId => db.collection('users').doc(playerId).get())
+    );
+    
+    const invalidPlayers = playerDocs.filter(doc => !doc.exists);
+    if (invalidPlayers.length > 0) {
+      return NextResponse.json(
+        { error: 'One or more players do not exist' },
+        { status: 400 }
+      );
+    }
+
+    const inactivePlayers = playerDocs.filter(doc => !doc.data()?.isActive);
+    if (inactivePlayers.length > 0) {
+      return NextResponse.json(
+        { error: 'One or more players are inactive' },
+        { status: 400 }
+      );
+    }
+
+    // Validate scores
+    const score1 = team1.score;
+    const score2 = team2.score;
+    
+    if (!Number.isInteger(score1) || !Number.isInteger(score2)) {
+      return NextResponse.json(
+        { error: 'Scores must be integers' },
+        { status: 400 }
+      );
+    }
+
+    if (score1 < 0 || score2 < 0) {
+      return NextResponse.json(
+        { error: 'Scores must be non-negative numbers' },
+        { status: 400 }
+      );
+    }
+
+    // A team must score at least 11 points to win
+    if (score1 < 11 && score2 < 11) {
+      return NextResponse.json(
+        { error: 'A team must score at least 11 points to win' },
+        { status: 400 }
+      );
+    }
+
+    // In pickleball, a team must win by 2 points
+    if (Math.abs(score1 - score2) < 2) {
+      return NextResponse.json(
+        { error: 'A team must win by at least 2 points' },
+        { status: 400 }
+      );
+    }
+
+    // Maximum score limit (optional, but good to have)
+    const MAX_SCORE = 30; // Adjust based on your rules
+    if (score1 > MAX_SCORE || score2 > MAX_SCORE) {
+      return NextResponse.json(
+        { error: `Scores cannot exceed ${MAX_SCORE}` },
+        { status: 400 }
+      );
+    }
+
+    // Check for duplicate game submission
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const gamesRef = db.collection('games');
     const recentGamesQuery = gamesRef
@@ -65,98 +154,163 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get current rankings for all players
-    const rankingsRef = db.collection('rankings');
-    const rankingDocs = await Promise.all([
-      ...team1.players.map((playerId: string) => rankingsRef.doc(`${seasonId}_${playerId}`).get()),
-      ...team2.players.map((playerId: string) => rankingsRef.doc(`${seasonId}_${playerId}`).get())
-    ]);
+    // Wrap the entire game recording process in a transaction
+    return await db.runTransaction(async (transaction) => {
+      // Get current rankings for all players
+      const rankingsRef = db.collection('rankings');
+      const rankingDocs = await Promise.all([
+        ...team1.players.map((playerId: string) => rankingsRef.doc(`${seasonId}_${playerId}`).get()),
+        ...team2.players.map((playerId: string) => rankingsRef.doc(`${seasonId}_${playerId}`).get())
+      ]);
 
-    // Initialize rankings for any players that don't have them yet
-    const initPromises = rankingDocs.map(async (rankingDoc, index) => {
-      if (!rankingDoc.exists) {
-        const playerId = [...team1.players, ...team2.players][index];
-        await rankingsRef.doc(`${seasonId}_${playerId}`).set({
-          seasonId,
-          userId: playerId,
-          currentElo: 1500,
+      // Initialize rankings for any players that don't have them yet
+      for (const [index, rankingDoc] of rankingDocs.entries()) {
+        if (!rankingDoc.exists) {
+          const playerId = [...team1.players, ...team2.players][index];
+          transaction.set(rankingsRef.doc(`${seasonId}_${playerId}`), {
+            seasonId,
+            userId: playerId,
+            currentElo: 1500,
+            wins: 0,
+            losses: 0,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now()
+          });
+        }
+      }
+
+      // Calculate average ELO for each team
+      const team1Elo = rankingDocs.slice(0, 2).reduce((sum, doc) => {
+        const data = doc.data();
+        return sum + (data?.currentElo || 1500);
+      }, 0) / 2;
+      const team2Elo = rankingDocs.slice(2).reduce((sum, doc) => {
+        const data = doc.data();
+        return sum + (data?.currentElo || 1500);
+      }, 0) / 2;
+
+      // Determine winner and calculate ELO changes
+      const team1Won = team1.score > team2.score;
+      const eloChange = calculateEloChange(team1Elo, team2Elo, team1Won);
+
+      // Get user data to include who recorded the game
+      const userDoc = await transaction.get(db.collection('users').doc(userId));
+      const userData = userDoc.data();
+
+      // Record the game
+      const gameRef = gamesRef.doc();
+      transaction.set(gameRef, {
+        seasonId,
+        team1: {
+          players: team1.players,
+          score: team1.score,
+          elo: team1Elo,
+        },
+        team2: {
+          players: team2.players,
+          score: team2.score,
+          elo: team2Elo,
+        },
+        eloChange,
+        createdAt: Timestamp.now(),
+        recordedBy: {
+          id: userId,
+          name: userData?.displayName || 'Unknown User',
+        },
+        gameTime: Timestamp.now(),
+      });
+
+      // Update player rankings and stats
+      for (const [index, playerId] of team1.players.entries()) {
+        const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
+        const userRef = db.collection('users').doc(playerId);
+        
+        const rankingDoc = await transaction.get(rankingRef);
+        const userDoc = await transaction.get(userRef);
+        
+        const rankingData = rankingDoc.data() || { currentElo: 1500, wins: 0, losses: 0 };
+        const userData = userDoc.data() || {};
+        const seasonStats = userData.seasonStats?.[seasonId] || {
+          eloRating: 1500,
+          gamesPlayed: 0,
           wins: 0,
           losses: 0,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now()
+          highestElo: 1500,
+          lowestElo: 1500,
+          winStreak: 0,
+          currentStreak: 0,
+        };
+
+        const newElo = Math.max(0, rankingData.currentElo + (team1Won ? eloChange : -eloChange));
+        const won = team1Won;
+
+        transaction.update(rankingRef, {
+          currentElo: newElo,
+          wins: (rankingData.wins || 0) + (won ? 1 : 0),
+          losses: (rankingData.losses || 0) + (won ? 0 : 1),
+          updatedAt: Timestamp.now(),
+        });
+
+        transaction.update(userRef, {
+          [`seasonStats.${seasonId}`]: {
+            eloRating: newElo,
+            gamesPlayed: seasonStats.gamesPlayed + 1,
+            wins: seasonStats.wins + (won ? 1 : 0),
+            losses: seasonStats.losses + (won ? 0 : 1),
+            highestElo: Math.max(seasonStats.highestElo, newElo),
+            lowestElo: Math.min(seasonStats.lowestElo, newElo),
+            winStreak: won ? seasonStats.winStreak + 1 : 0,
+            currentStreak: won ? seasonStats.currentStreak + 1 : 0,
+          }
         });
       }
-    });
-    await Promise.all(initPromises);
 
-    // Calculate average ELO for each team
-    const team1Elo = rankingDocs.slice(0, 2).reduce((sum, doc) => {
-      const data = doc.data();
-      return sum + (data?.currentElo || 1500);
-    }, 0) / 2;
-    const team2Elo = rankingDocs.slice(2).reduce((sum, doc) => {
-      const data = doc.data();
-      return sum + (data?.currentElo || 1500);
-    }, 0) / 2;
-
-    // Determine winner and calculate ELO changes
-    const team1Won = team1.score > team2.score;
-    const eloChange = calculateEloChange(team1Elo, team2Elo, team1Won);
-
-    // Get user data to include who recorded the game
-    const userDoc = await db.collection('users').doc(userId).get();
-    const userData = userDoc.data();
-
-    // Record the game with timestamp and recorded by info
-    const gameDoc = await gamesRef.add({
-      seasonId,
-      team1: {
-        players: team1.players,
-        score: team1.score,
-        elo: team1Elo,
-      },
-      team2: {
-        players: team2.players,
-        score: team2.score,
-        elo: team2Elo,
-      },
-      eloChange,
-      createdAt: Timestamp.now(),
-      recordedBy: {
-        id: userId,
-        name: userData?.displayName || 'Unknown User',
-      },
-      gameTime: Timestamp.now(),
-    });
-
-    // Update player rankings
-    const updatePromises = [
-      ...team1.players.map((playerId: string) => {
+      for (const [index, playerId] of team2.players.entries()) {
         const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
-        const ranking = rankingDocs.find(doc => doc.id === `${seasonId}_${playerId}`);
-        const data = ranking?.data() || { currentElo: 1500, wins: 0, losses: 0 };
-        return rankingRef.update({
-          currentElo: data.currentElo + (team1Won ? eloChange : -eloChange),
-          wins: (data.wins || 0) + (team1Won ? 1 : 0),
-          losses: (data.losses || 0) + (team1Won ? 0 : 1),
+        const userRef = db.collection('users').doc(playerId);
+        
+        const rankingDoc = await transaction.get(rankingRef);
+        const userDoc = await transaction.get(userRef);
+        
+        const rankingData = rankingDoc.data() || { currentElo: 1500, wins: 0, losses: 0 };
+        const userData = userDoc.data() || {};
+        const seasonStats = userData.seasonStats?.[seasonId] || {
+          eloRating: 1500,
+          gamesPlayed: 0,
+          wins: 0,
+          losses: 0,
+          highestElo: 1500,
+          lowestElo: 1500,
+          winStreak: 0,
+          currentStreak: 0,
+        };
+
+        const newElo = Math.max(0, rankingData.currentElo + (team1Won ? -eloChange : eloChange));
+        const won = !team1Won;
+
+        transaction.update(rankingRef, {
+          currentElo: newElo,
+          wins: (rankingData.wins || 0) + (won ? 1 : 0),
+          losses: (rankingData.losses || 0) + (won ? 0 : 1),
           updatedAt: Timestamp.now(),
         });
-      }),
-      ...team2.players.map((playerId: string) => {
-        const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
-        const ranking = rankingDocs.find(doc => doc.id === `${seasonId}_${playerId}`);
-        const data = ranking?.data() || { currentElo: 1500, wins: 0, losses: 0 };
-        return rankingRef.update({
-          currentElo: data.currentElo + (team1Won ? -eloChange : eloChange),
-          wins: (data.wins || 0) + (team1Won ? 0 : 1),
-          losses: (data.losses || 0) + (team1Won ? 1 : 0),
-          updatedAt: Timestamp.now(),
-        });
-      }),
-    ];
-    await Promise.all(updatePromises);
 
-    return NextResponse.json({ success: true, gameId: gameDoc.id });
+        transaction.update(userRef, {
+          [`seasonStats.${seasonId}`]: {
+            eloRating: newElo,
+            gamesPlayed: seasonStats.gamesPlayed + 1,
+            wins: seasonStats.wins + (won ? 1 : 0),
+            losses: seasonStats.losses + (won ? 0 : 1),
+            highestElo: Math.max(seasonStats.highestElo, newElo),
+            lowestElo: Math.min(seasonStats.lowestElo, newElo),
+            winStreak: won ? seasonStats.winStreak + 1 : 0,
+            currentStreak: won ? seasonStats.currentStreak + 1 : 0,
+          }
+        });
+      }
+
+      return NextResponse.json({ success: true, gameId: gameRef.id });
+    });
   } catch (error) {
     console.error('Error recording game:', error);
     return NextResponse.json(
