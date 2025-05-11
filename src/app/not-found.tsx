@@ -9,7 +9,7 @@ export default function NotFound() {
       </p>
       <p style={{ margin: '2rem 0' }}>Shaheer if you're poking around.. keep trying buddy.</p>
       <Link href="/">
-        <span style={{ color: '#0070f3', textDecoration: 'underline', cursor: 'pointer' }}>
+        <span style={{ color: '#0076A8', textDecoration: 'underline', cursor: 'pointer' }}>
           Go back home
         </span>
       </Link>

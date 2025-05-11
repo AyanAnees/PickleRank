@@ -4,7 +4,7 @@
 
 :root {
   --foreground-rgb: 0, 0, 0;
-  --background-rgb: 249, 250, 251;
+  --background-rgb: 244, 245, 240;
 }
 
 body {
@@ -14,15 +14,15 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors;
+    @apply bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors;
+    @apply bg-secondary text-white px-4 py-2 rounded-lg hover:bg-secondary/90 transition-colors;
   }
 
   .input-field {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500;
+    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary;
   }
 
   .card {
