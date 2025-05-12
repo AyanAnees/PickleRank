@@ -6,7 +6,7 @@ import SeasonRankings from '@/components/SeasonRankings';
 import RecordGame from '@/components/RecordGame';
 import GameHistory from '@/components/GameHistory';
 import { Season } from '@/types';
-import { signOut } from '../client/auth';
+import { signOut } from '@/client/auth';
 
 export default function Dashboard() {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
@@ -40,7 +40,6 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    // TODO: Move auth check to a client context or API route
     setLoading(false);
   }, []);
 
@@ -51,7 +50,6 @@ export default function Dashboard() {
   }, [loading]);
 
   const handleGameRecorded = () => {
-    // Instead of refreshing the page, just fetch the latest data
     fetchSeasons();
     setRefreshKey((k) => k + 1);
   };
@@ -119,7 +117,6 @@ export default function Dashboard() {
                 const endDate = new Date(currentSeason.endDate);
                 const now = new Date();
                 const daysUntilEnd = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                
                 if (daysUntilEnd <= 14 && daysUntilEnd > 0) {
                   return (
                     <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
