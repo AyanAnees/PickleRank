@@ -192,9 +192,9 @@ export async function POST(request: Request) {
       const team1Won = team1.score > team2.score;
       const scoreDiff = Math.abs(team1.score - team2.score);
       const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won, scoreDiff));
-      // Get user data to include who recorded the game (from userDocs)
-      const userIndex = allPlayerIds.findIndex((id) => id === userId);
-      const userData = userDocs[userIndex]?.data();
+      // Get user data to include who recorded the game (fetch directly, not from players)
+      const recorderDoc = await db.collection('users').doc(userId).get();
+      const userData = recorderDoc.data();
       // Record the game
       const gameRef = gamesRef.doc();
       transaction.set(gameRef, {
