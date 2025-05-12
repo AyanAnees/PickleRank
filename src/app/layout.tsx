@@ -18,9 +18,9 @@ export const metadata: Metadata = {
     description: 'Shaheer is not here is he',
     images: [
       {
-        url: '/favicon.ico',
-        width: 512,
-        height: 512,
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
         alt: 'PickleRank',
       },
     ],
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'PickleRank - Go PICKLEHEADS',
     description: 'Cypress boyyyyyssss',
-    images: ['/favicon.ico'],
+    images: ['/og-image.png'],
   },
 };
 
