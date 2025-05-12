@@ -213,7 +213,9 @@ export async function POST(request: Request) {
         createdAt: Timestamp.now(),
         recordedBy: {
           id: userId,
-          name: userData?.displayName || 'Unknown User',
+          name: (userData?.firstName && userData?.lastName)
+            ? `${userData.firstName} ${userData.lastName}`
+            : userData?.displayName || 'Unknown User',
         },
         gameTime: Timestamp.now(),
       });
