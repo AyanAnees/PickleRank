@@ -10,9 +10,11 @@ const db = admin.firestore();
 const BASE_ELO = 1500;
 const K = 32; // Or whatever your K-factor is
 
-function calculateEloChange(playerElo, opponentElo, didWin) {
+function calculateEloChange(playerElo, opponentElo, didWin, scoreDiff) {
   const expected = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
-  return Math.round(K * ((didWin ? 1 : 0) - expected));
+  // Margin multiplier: 1x for a 2-point win, up to 1.5x for a 7+ point win
+  const marginMultiplier = 1 + Math.min((scoreDiff - 2) / 10, 0.5);
+  return Math.round(K * ((didWin ? 1 : 0) - expected) * marginMultiplier);
 }
 
 async function recalculateSeason(seasonId) {
@@ -55,7 +57,8 @@ async function recalculateSeason(seasonId) {
     const team1Elo = team1.reduce((sum, id) => sum + (playerElo[id] || BASE_ELO), 0) / team1.length;
     const team2Elo = team2.reduce((sum, id) => sum + (playerElo[id] || BASE_ELO), 0) / team2.length;
     const team1Won = data.team1.score > data.team2.score;
-    const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won));
+    const scoreDiff = Math.abs(data.team1.score - data.team2.score);
+    const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won, scoreDiff));
 
     // Update team1
     for (const id of team1) {

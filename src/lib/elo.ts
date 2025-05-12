@@ -12,18 +12,22 @@ function calculateExpectedScore(playerElo: number, opponentElo: number): number 
 }
 
 /**
- * Calculate the ELO change for a game
+ * Calculate the ELO change for a game, factoring in margin of victory
  * @param playerElo The player's current ELO rating
- * @param opponentElo The opponent's current ELO rating
+ * @param opponentElo The opponent's ELO rating
  * @param playerWon Whether the player won the game
+ * @param scoreDiff The absolute score difference (margin of victory)
  * @returns The ELO change (positive if player won, negative if player lost)
  */
 export function calculateEloChange(
   playerElo: number,
   opponentElo: number,
-  playerWon: boolean
+  playerWon: boolean,
+  scoreDiff: number
 ): number {
   const expectedScore = calculateExpectedScore(playerElo, opponentElo);
   const actualScore = playerWon ? 1 : 0;
-  return Math.round(K_FACTOR * (actualScore - expectedScore));
+  // Margin multiplier: 1x for a 2-point win, up to 1.5x for a 7+ point win
+  const marginMultiplier = 1 + Math.min((scoreDiff - 2) / 10, 0.5);
+  return Math.round(K_FACTOR * (actualScore - expectedScore) * marginMultiplier);
 } 
