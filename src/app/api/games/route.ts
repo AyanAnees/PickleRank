@@ -197,7 +197,7 @@ export async function POST(request: Request) {
 
       // Determine winner and calculate ELO changes
       const team1Won = team1.score > team2.score;
-      const eloChange = calculateEloChange(team1Elo, team2Elo, team1Won);
+      const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won));
 
       // Get user data to include who recorded the game
       const userDoc = await transaction.get(db.collection('users').doc(userId));
@@ -421,7 +421,7 @@ async function recalculateSeasonElo(seasonId: string) {
     const team1Elo = team1Docs.reduce((sum: number, doc) => sum + (doc.data()?.currentElo || 1500), 0) / 2;
     const team2Elo = team2Docs.reduce((sum: number, doc) => sum + (doc.data()?.currentElo || 1500), 0) / 2;
     const team1Won = game.team1.score > game.team2.score;
-    const eloChange = calculateEloChange(team1Elo, team2Elo, team1Won);
+    const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won));
     // Update team1
     for (const doc of team1Docs) {
       const data = doc.data() || { currentElo: 1500, wins: 0, losses: 0 };
