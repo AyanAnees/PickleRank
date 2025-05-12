@@ -86,14 +86,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const inactivePlayers = playerDocs.filter(doc => !doc.data()?.isActive);
-    if (inactivePlayers.length > 0) {
-      return NextResponse.json(
-        { error: 'One or more players are inactive' },
-        { status: 400 }
-      );
-    }
-
     // Validate scores
     const score1 = team1.score;
     const score2 = team2.score;

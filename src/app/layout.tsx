@@ -2,7 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import EloFooter from '../components/EloFooter';
+import Footer from './Footer';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -43,7 +43,7 @@ export default function RootLayout({
         <main className="max-w-md mx-auto px-4 py-8">
           {children}
         </main>
-        <EloFooter />
+        <Footer />
       </body>
     </html>
   );
