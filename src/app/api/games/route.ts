@@ -60,6 +60,12 @@ export async function POST(request: Request) {
 
     // Validate all players exist and are active
     const allPlayers = [...team1.players, ...team2.players];
+    if (allPlayers.some(p => !p || typeof p !== 'string' || p.trim() === '')) {
+      return NextResponse.json(
+        { error: 'All player IDs must be non-empty strings' },
+        { status: 400 }
+      );
+    }
     const uniquePlayers = new Set(allPlayers);
     if (uniquePlayers.size !== 4) {
       return NextResponse.json(

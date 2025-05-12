@@ -17,17 +17,33 @@ export async function GET(
       
       // Get player information for both teams
       const team1Players = await Promise.all(
-        data.team1.players.map(async (playerId: string) => {
-          const playerDoc = await db.collection('users').doc(playerId).get();
-          return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
-        })
+        data.team1.players
+          .filter((p: any) => !!p)
+          .map(async (p: any) => {
+            if (typeof p === 'string') {
+              const playerDoc = await db.collection('users').doc(p).get();
+              return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
+            } else if (typeof p === 'object' && p.displayName) {
+              return p;
+            } else {
+              return { displayName: 'Unknown Player' };
+            }
+          })
       );
 
       const team2Players = await Promise.all(
-        data.team2.players.map(async (playerId: string) => {
-          const playerDoc = await db.collection('users').doc(playerId).get();
-          return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
-        })
+        data.team2.players
+          .filter((p: any) => !!p)
+          .map(async (p: any) => {
+            if (typeof p === 'string') {
+              const playerDoc = await db.collection('users').doc(p).get();
+              return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
+            } else if (typeof p === 'object' && p.displayName) {
+              return p;
+            } else {
+              return { displayName: 'Unknown Player' };
+            }
+          })
       );
 
       return {
