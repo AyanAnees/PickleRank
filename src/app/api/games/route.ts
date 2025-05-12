@@ -154,17 +154,20 @@ export async function POST(request: Request) {
 
     // Wrap the entire game recording process in a transaction
     return await db.runTransaction(async (transaction) => {
-      // Get current rankings for all players
       const rankingsRef = db.collection('rankings');
-      const rankingDocs = await Promise.all([
-        ...team1.players.map((playerId: string) => rankingsRef.doc(`${seasonId}_${playerId}`).get()),
-        ...team2.players.map((playerId: string) => rankingsRef.doc(`${seasonId}_${playerId}`).get())
-      ]);
-
-      // Initialize rankings for any players that don't have them yet
+      const usersRef = db.collection('users');
+      // Get all ranking and user docs for all players (reads first)
+      const allPlayerIds = [...team1.players, ...team2.players];
+      const rankingDocs = await Promise.all(
+        allPlayerIds.map((playerId) => transaction.get(rankingsRef.doc(`${seasonId}_${playerId}`)))
+      );
+      const userDocs = await Promise.all(
+        allPlayerIds.map((playerId) => transaction.get(usersRef.doc(playerId)))
+      );
+      // Initialize rankings for any players that don't have them yet (writes)
       for (const [index, rankingDoc] of rankingDocs.entries()) {
         if (!rankingDoc.exists) {
-          const playerId = [...team1.players, ...team2.players][index];
+          const playerId = allPlayerIds[index];
           transaction.set(rankingsRef.doc(`${seasonId}_${playerId}`), {
             seasonId,
             userId: playerId,
@@ -176,7 +179,6 @@ export async function POST(request: Request) {
           });
         }
       }
-
       // Calculate average ELO for each team
       const team1Elo = rankingDocs.slice(0, 2).reduce((sum, doc) => {
         const data = doc.data();
@@ -186,16 +188,13 @@ export async function POST(request: Request) {
         const data = doc.data();
         return sum + (data?.currentElo || 1500);
       }, 0) / 2;
-
       // Determine winner and calculate ELO changes
       const team1Won = team1.score > team2.score;
       const scoreDiff = Math.abs(team1.score - team2.score);
       const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won, scoreDiff));
-
-      // Get user data to include who recorded the game
-      const userDoc = await transaction.get(db.collection('users').doc(userId));
-      const userData = userDoc.data();
-
+      // Get user data to include who recorded the game (from userDocs)
+      const userIndex = allPlayerIds.findIndex((id) => id === userId);
+      const userData = userDocs[userIndex]?.data();
       // Record the game
       const gameRef = gamesRef.doc();
       transaction.set(gameRef, {
@@ -218,15 +217,13 @@ export async function POST(request: Request) {
         },
         gameTime: Timestamp.now(),
       });
-
-      // Update player rankings and stats
-      for (const [index, playerId] of team1.players.entries()) {
+      // Update player rankings and stats (writes only)
+      for (let i = 0; i < team1.players.length; i++) {
+        const playerId = team1.players[i];
         const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
-        const userRef = db.collection('users').doc(playerId);
-        
-        const rankingDoc = await transaction.get(rankingRef);
-        const userDoc = await transaction.get(userRef);
-        
+        const userRef = usersRef.doc(playerId);
+        const rankingDoc = rankingDocs[i];
+        const userDoc = userDocs[i];
         const rankingData = rankingDoc.data() || { currentElo: 1500, wins: 0, losses: 0 };
         const userData = userDoc.data() || {};
         const seasonStats = userData.seasonStats?.[seasonId] || {
@@ -239,17 +236,14 @@ export async function POST(request: Request) {
           winStreak: 0,
           currentStreak: 0,
         };
-
         const newElo = Math.max(0, rankingData.currentElo + (team1Won ? eloChange : -eloChange));
         const won = team1Won;
-
         transaction.update(rankingRef, {
           currentElo: newElo,
           wins: (rankingData.wins || 0) + (won ? 1 : 0),
           losses: (rankingData.losses || 0) + (won ? 0 : 1),
           updatedAt: Timestamp.now(),
         });
-
         transaction.update(userRef, {
           [`seasonStats.${seasonId}`]: {
             eloRating: newElo,
@@ -263,14 +257,12 @@ export async function POST(request: Request) {
           }
         });
       }
-
-      for (const [index, playerId] of team2.players.entries()) {
+      for (let i = 0; i < team2.players.length; i++) {
+        const playerId = team2.players[i];
         const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
-        const userRef = db.collection('users').doc(playerId);
-        
-        const rankingDoc = await transaction.get(rankingRef);
-        const userDoc = await transaction.get(userRef);
-        
+        const userRef = usersRef.doc(playerId);
+        const rankingDoc = rankingDocs[i + 2];
+        const userDoc = userDocs[i + 2];
         const rankingData = rankingDoc.data() || { currentElo: 1500, wins: 0, losses: 0 };
         const userData = userDoc.data() || {};
         const seasonStats = userData.seasonStats?.[seasonId] || {
@@ -283,17 +275,14 @@ export async function POST(request: Request) {
           winStreak: 0,
           currentStreak: 0,
         };
-
         const newElo = Math.max(0, rankingData.currentElo + (team1Won ? -eloChange : eloChange));
         const won = !team1Won;
-
         transaction.update(rankingRef, {
           currentElo: newElo,
           wins: (rankingData.wins || 0) + (won ? 1 : 0),
           losses: (rankingData.losses || 0) + (won ? 0 : 1),
           updatedAt: Timestamp.now(),
         });
-
         transaction.update(userRef, {
           [`seasonStats.${seasonId}`]: {
             eloRating: newElo,
@@ -307,7 +296,6 @@ export async function POST(request: Request) {
           }
         });
       }
-
       return NextResponse.json({ success: true, gameId: gameRef.id });
     });
   } catch (error) {

@@ -1,3 +1,4 @@
+'use client';
 import React, { useEffect, useState } from 'react';
 import { User } from '../types';
 import { Game } from '@/types';

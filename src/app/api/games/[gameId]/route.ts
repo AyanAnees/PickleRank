@@ -166,7 +166,8 @@ async function recalculateSeasonElo(seasonId: string) {
     const team1Elo = team1Docs.reduce((sum, doc) => sum + (doc.data()?.currentElo || 1500), 0) / 2;
     const team2Elo = team2Docs.reduce((sum, doc) => sum + (doc.data()?.currentElo || 1500), 0) / 2;
     const team1Won = game.team1.score > game.team2.score;
-    const eloChange = calculateEloChange(team1Elo, team2Elo, team1Won);
+    const scoreDiff = Math.abs(game.team1.score - game.team2.score);
+    const eloChange = calculateEloChange(team1Elo, team2Elo, team1Won, scoreDiff);
 
     // Update team1
     for (const doc of team1Docs) {

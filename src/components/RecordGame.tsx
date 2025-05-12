@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +11,7 @@ interface RecordGameProps {
 
 export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps) {
   const { user } = useAuth();
+  console.log('RecordGame user:', user);
   const [players, setPlayers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
