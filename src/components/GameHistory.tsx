@@ -141,24 +141,31 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
           const gameTime = formatGameTime(game.gameTime);
           const team1Won = game.team1.score > game.team2.score;
           const team2Won = game.team2.score > game.team1.score;
+
+          // Determine winner and loser for display
+          const winner = team1Won ? game.team1 : game.team2;
+          const loser = team1Won ? game.team2 : game.team1;
+          const winnerScore = team1Won ? game.team1.score : game.team2.score;
+          const loserScore = team1Won ? game.team2.score : game.team1.score;
+          const winnerTrophy = team1Won ? team1Won : team2Won;
+
           return (
             <div key={game.id} className="border rounded-lg p-4 bg-white shadow-sm relative">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1">
-                  {/* Enhanced stacked teams with winner highlight and centered score/ELO */}
+                  {/* Winner on top, loser below */}
                   <div className="flex flex-col items-center">
-                    <div className={team1Won ? 'font-bold text-green-700 flex items-center mb-1' : 'font-medium mb-1'}>
-                      {team1Won && <span className="mr-1">🏆</span>}
-                      {game.team1.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
+                    <div className={'font-bold text-green-700 flex items-center mb-1'}>
+                      <span className="mr-1">🏆</span>
+                      {winner.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
                     </div>
                     <div className="my-1 text-xs text-gray-500 flex items-center">
-                      <span className="mx-2">Score: {game.team1.score} - {game.team2.score}</span>
+                      <span className="mx-2">Score: {winnerScore} - {loserScore}</span>
                       <span className="mx-2 text-gray-300">|</span>
                       <span className="mx-2 text-gray-400">±{game.eloChange} ELO</span>
                     </div>
-                    <div className={team2Won ? 'font-bold text-green-700 flex items-center mt-1' : 'font-medium mt-1'}>
-                      {team2Won && <span className="mr-1">🏆</span>}
-                      {game.team2.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
+                    <div className={'font-medium mt-1'}>
+                      {loser.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
                     </div>
                   </div>
                   {game.recordedBy?.name && (
