@@ -142,7 +142,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
           const team1Won = game.team1.score > game.team2.score;
           const team2Won = game.team2.score > game.team1.score;
           return (
-            <div key={game.id} className="border rounded-lg p-4 bg-white shadow-sm">
+            <div key={game.id} className="border rounded-lg p-4 bg-white shadow-sm relative">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
@@ -157,12 +157,6 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                         {team2Won && <span className="ml-2" title="Winner">🏆</span>}
                       </span>
                     </div>
-                    {gameTime && (
-                      <div className="text-sm text-gray-500">
-                        <div>{gameTime.full}</div>
-                        <div className="text-xs">({gameTime.relative})</div>
-                      </div>
-                    )}
                   </div>
                   <div className="mt-1 text-sm text-gray-600">
                     Score: {game.team1.score} - {game.team2.score}
@@ -188,6 +182,12 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                   </div>
                 )}
               </div>
+              {gameTime && (
+                <div className="absolute bottom-2 left-4 text-[10px] text-gray-400 text-left">
+                  {gameTime.full}
+                  <span className="ml-1">({gameTime.relative})</span>
+                </div>
+              )}
             </div>
           );
         })}
