@@ -256,7 +256,8 @@ export async function POST(request: Request) {
             lowestElo: Math.min(seasonStats.lowestElo, newElo),
             winStreak: won ? seasonStats.winStreak + 1 : 0,
             currentStreak: won ? seasonStats.currentStreak + 1 : 0,
-          }
+          },
+          elo: newElo,
         });
       }
       for (let i = 0; i < team2.players.length; i++) {
@@ -295,7 +296,8 @@ export async function POST(request: Request) {
             lowestElo: Math.min(seasonStats.lowestElo, newElo),
             winStreak: won ? seasonStats.winStreak + 1 : 0,
             currentStreak: won ? seasonStats.currentStreak + 1 : 0,
-          }
+          },
+          elo: newElo,
         });
       }
       return NextResponse.json({ success: true, gameId: gameRef.id });
