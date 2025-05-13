@@ -26,6 +26,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [showCount, setShowCount] = useState(3);
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -137,7 +138,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
     <div className="card space-y-4">
       <h3 className="text-xl font-semibold">Game History</h3>
       <div className="space-y-4">
-        {games.map((game) => {
+        {games.slice(0, showCount).map((game) => {
           const gameTime = formatGameTime(game.gameTime);
           const team1Won = game.team1.score > game.team2.score;
           const team2Won = game.team2.score > game.team1.score;
@@ -190,6 +191,14 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
             </div>
           );
         })}
+        {games.length > showCount && (
+          <button
+            onClick={() => setShowCount(showCount + 3)}
+            className="text-xs text-blue-600 mt-2"
+          >
+            See more
+          </button>
+        )}
       </div>
     </div>
   );
