@@ -167,6 +167,14 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                   <div className="mt-1 text-sm text-gray-600">
                     Score: {game.team1.score} - {game.team2.score}
                   </div>
+                  <div className="mt-1 text-xs text-gray-400">
+                    <span className="inline-flex flex-col items-center mr-1 leading-none align-middle">
+                      <span>+</span>
+                      <span>−</span>
+                    </span>
+                    <span>{game.eloChange}</span>
+                    <span className="ml-1">ELO</span>
+                  </div>
                   {game.recordedBy?.name && (
                     <div className="mt-1 text-xs text-gray-500">
                       Recorded by {game.recordedBy.name}

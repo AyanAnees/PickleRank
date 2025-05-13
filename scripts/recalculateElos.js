@@ -78,6 +78,10 @@ async function recalculateSeason(seasonId) {
       playerStats[id].highestElo = Math.max(playerStats[id].highestElo, playerElo[id]);
       playerStats[id].lowestElo = Math.min(playerStats[id].lowestElo, playerElo[id]);
     }
+
+    // Update the game's eloChange field in Firestore
+    await db.collection('games').doc(doc.id).update({ eloChange });
+    console.log(`Updated game ${doc.id} eloChange to ${eloChange}`);
   }
 
   // 6. Update rankings in Firestore
