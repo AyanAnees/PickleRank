@@ -150,6 +150,14 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
     return <div>Loading players...</div>;
   }
 
+  // Sort players alphabetically by first name (then last name)
+  const sortedPlayers = [...players].sort((a, b) => {
+    if (a.firstName.toLowerCase() === b.firstName.toLowerCase()) {
+      return a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase());
+    }
+    return a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase());
+  });
+
   return (
     <div className="card space-y-4">
       <h3 className="text-xl font-semibold">Record Game</h3>
@@ -179,7 +187,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 disabled={isSubmitting}
               >
                 <option value="">Select Player 1</option>
-                {players.map((player) => (
+                {sortedPlayers.map((player) => (
                   <option key={player.id} value={player.id}>
                     {player.displayName}
                   </option>
@@ -193,7 +201,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 disabled={isSubmitting}
               >
                 <option value="">Select Player 2</option>
-                {players.map((player) => (
+                {sortedPlayers.map((player) => (
                   <option key={player.id} value={player.id}>
                     {player.displayName}
                   </option>
@@ -223,7 +231,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 disabled={isSubmitting}
               >
                 <option value="">Select Player 1</option>
-                {players.map((player) => (
+                {sortedPlayers.map((player) => (
                   <option key={player.id} value={player.id}>
                     {player.displayName}
                   </option>
@@ -237,7 +245,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 disabled={isSubmitting}
               >
                 <option value="">Select Player 2</option>
-                {players.map((player) => (
+                {sortedPlayers.map((player) => (
                   <option key={player.id} value={player.id}>
                     {player.displayName}
                   </option>

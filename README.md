@@ -6,11 +6,13 @@ A modern, mobile-first application for tracking and ranking pickleball players u
 
 - 🔐 Google Authentication
 - 📱 Mobile-first design
-- 🏆 ELO-based ranking system
+- 🏆 ELO-based ranking system (with margin of victory)
 - 📊 Game score tracking
 - 👥 Player management
 - 👑 Admin controls
 - 📈 Player statistics and history
+- 🎯 ELO change displayed for each game
+- 🕒 Clean, mobile-friendly match history UI
 
 ## Tech Stack
 
@@ -50,6 +52,32 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 ```
+
+## Recent Updates
+
+- **ELO System:** ELO now factors in the margin of victory (score difference) for each game, not just win/loss.
+- **Game History UI:** 
+  - Teams are displayed in a stacked, modern format with a clear winner highlight and trophy.
+  - ELO change for each game is shown as a subtle badge under the score.
+  - Date/timestamp is tiny and left-aligned at the bottom of each game card for mobile-friendliness.
+- **User ELO Sync:** The top-level `elo` field in each user document is always kept in sync with their current season ELO for future features like matchmaking.
+- **Scripts:**
+  - `scripts/recalculateElos.js`: Recalculates all ELOs for a season, updates rankings, user ELOs, and each game's `eloChange` field.
+  - `scripts/syncUserElos.js`: Syncs all users' top-level `elo` field to match their current ELO in the active season's rankings.
+- **Admin Controls:** Admins (by phone number) can edit or delete games.
+
+## How ELO Works
+
+- ELO is updated after every game, factoring in both win/loss and the margin of victory.
+- Editing or deleting a game triggers a full season ELO recalculation for all players and updates all affected game `eloChange` values.
+- ELO change is displayed for each game in match history.
+
+## Scripts
+
+- **Recalculate ELOs:**  
+  Run `node scripts/recalculateElos.js <seasonId>` to recalculate all ELOs, update rankings, user ELOs, and each game's `eloChange`.
+- **Sync User ELOs:**  
+  Run `node scripts/syncUserElos.js` to sync all users' top-level `elo` field to their current ELO in the active season.
 
 ## Contributing
 
