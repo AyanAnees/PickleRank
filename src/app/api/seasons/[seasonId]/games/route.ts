@@ -22,13 +22,13 @@ export async function GET(
           .map(async (p: any) => {
             if (typeof p === 'string') {
               const playerDoc = await db.collection('users').doc(p).get();
-              return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
+          return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
             } else if (typeof p === 'object' && p.displayName) {
               return p;
             } else {
               return { displayName: 'Unknown Player' };
             }
-          })
+        })
       );
 
       const team2Players = await Promise.all(
@@ -37,13 +37,13 @@ export async function GET(
           .map(async (p: any) => {
             if (typeof p === 'string') {
               const playerDoc = await db.collection('users').doc(p).get();
-              return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
+          return playerDoc.exists ? playerDoc.data() : { displayName: 'Unknown Player' };
             } else if (typeof p === 'object' && p.displayName) {
               return p;
             } else {
               return { displayName: 'Unknown Player' };
             }
-          })
+        })
       );
 
       return {

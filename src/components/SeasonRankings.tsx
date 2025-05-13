@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { User, SeasonRanking } from '@/types';
+import PlayerProfile from './PlayerProfile';
 
 interface SeasonRankingsProps {
   seasonId: string;
@@ -19,6 +20,7 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
   const [unranked, setUnranked] = useState<SeasonRanking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<User | null>(null);
 
   useEffect(() => {
     const fetchRankings = async () => {
@@ -93,7 +95,12 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
               <div className="flex items-center space-x-4">
                 <span className="text-lg font-semibold text-gray-600">#{index + 1}</span>
                 <div className="flex items-center">
-                  <span className="font-medium">{user?.displayName || 'Unknown Player'}</span>
+                  <button
+                    onClick={() => user && setSelectedPlayer(user)}
+                    className="font-medium hover:text-indigo-600 transition-colors"
+                  >
+                    {user?.displayName || 'Unknown Player'}
+                  </button>
                   {medal}
                 </div>
               </div>
@@ -113,7 +120,12 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
                 <div key={ranking.userId} className="flex items-center justify-between p-2 bg-gray-50 rounded shadow">
                   <div className="flex items-center space-x-4">
                     <div>
-                      <span className="font-medium">{user?.displayName || 'Unknown Player'}</span>
+                      <button
+                        onClick={() => user && setSelectedPlayer(user)}
+                        className="font-medium hover:text-indigo-600 transition-colors"
+                      >
+                        {user?.displayName || 'Unknown Player'}
+                      </button>
                       <div className="text-sm text-gray-500">
                         {ranking.gamesPlayed} games played - {5 - ranking.gamesPlayed} more needed
                       </div>
@@ -125,6 +137,14 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
             })}
           </div>
         </div>
+      )}
+
+      {selectedPlayer && (
+        <PlayerProfile
+          player={selectedPlayer}
+          seasonId={seasonId}
+          onClose={() => setSelectedPlayer(null)}
+        />
       )}
     </div>
   );

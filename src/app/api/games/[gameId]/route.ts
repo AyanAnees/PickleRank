@@ -134,13 +134,13 @@ async function recalculateSeasonElo(seasonId: string) {
       const userRef = usersRef.doc(playerId);
       
       transaction.set(rankingRef, {
-        seasonId,
-        userId: playerId,
-        currentElo: 1500,
-        wins: 0,
-        losses: 0,
-        updatedAt: new Date(),
-      });
+      seasonId,
+      userId: playerId,
+      currentElo: 1500,
+      wins: 0,
+      losses: 0,
+      updatedAt: new Date(),
+    });
 
       transaction.update(userRef, {
         [`seasonStats.${seasonId}`]: {
@@ -199,8 +199,8 @@ async function recalculateSeasonElo(seasonId: string) {
           currentElo: newElo,
           wins: (rankingData.wins || 0) + (won ? 1 : 0),
           losses: (rankingData.losses || 0) + (won ? 0 : 1),
-          updatedAt: new Date(),
-        });
+        updatedAt: new Date(),
+      });
 
         transaction.update(userRef, {
           [`seasonStats.${seasonId}`]: {
@@ -247,7 +247,7 @@ async function recalculateSeasonElo(seasonId: string) {
           currentElo: newElo,
           wins: (rankingData.wins || 0) + (won ? 1 : 0),
           losses: (rankingData.losses || 0) + (won ? 0 : 1),
-          updatedAt: new Date(),
+        updatedAt: new Date(),
         });
 
         transaction.update(userRef, {
