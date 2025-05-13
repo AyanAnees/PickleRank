@@ -96,11 +96,6 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
                   <span className="font-medium">{user?.displayName || 'Unknown Player'}</span>
                   {medal}
                 </div>
-                <div className="ml-4">
-                  <div className="text-sm text-gray-500">
-                    Games: {ranking.gamesPlayed}/5
-                  </div>
-                </div>
               </div>
               <span className="text-lg font-semibold text-indigo-600">{ranking.currentElo}</span>
             </div>

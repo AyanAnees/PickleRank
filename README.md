@@ -122,4 +122,19 @@ Feel free to submit issues and enhancement requests!
 
 ---
 
-*For any future features or changes, please update this section to keep project goals clear for all contributors.* 
+*For any future features or changes, please update this section to keep project goals clear for all contributors.*
+
+## Future Ideas & Discussion
+
+- **Shorten or Remove Games Played in Rankings:**
+  - The current display of 'Games: X/X' can push the ELO value off to the side. Consider shortening, reformatting, or removing it for a cleaner look.
+
+- **Gamify ELO/Ranking Progression:**
+  - Consider rebranding ELO points to something more addictive and game-like (e.g., 'RR' as in Valorant) to make climbing the leaderboard more engaging.
+
+- **Matchmaker Module:**
+  - Add a 'Matchmaker' button under the Season title. This would open a module where users can select which players are present (via checkboxes), and the system suggests fair or randomized teams.
+  - Possible parameters: most fair game (by ELO), most randomized, or based on match history (who has played with/against each other the least this season).
+  - This could help balance games and keep things fresh and fun.
+
+*These are ideas for future discussion and not yet implemented. Feel free to add, discuss, or refine further!* 
