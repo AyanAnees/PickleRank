@@ -7,6 +7,7 @@ import RecordGame from '@/components/RecordGame';
 import GameHistory from '@/components/GameHistory';
 import { Season } from '@/types';
 import { signOut } from '@/client/auth';
+import MatchmakingModal from '@/components/MatchmakingModal';
 
 export default function Dashboard() {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'game' | 'rankings'>('game');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showMatchmaking, setShowMatchmaking] = useState(false);
   const router = useRouter();
 
   // TODO: Replace with real user context
@@ -72,9 +74,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
             <div className="flex items-center gap-4">
               {currentSeason && (
-                <div className="text-lg text-gray-600">
-                  {currentSeason.name}
-                </div>
+                <div className="text-lg text-gray-600">{currentSeason.name}</div>
               )}
               <button
                 onClick={async () => {
@@ -108,6 +108,13 @@ export default function Dashboard() {
                   </option>
                 ))}
               </select>
+              <button
+                className="text-indigo-600 hover:underline text-sm font-medium mt-2 focus:outline-none"
+                onClick={() => setShowMatchmaking(true)}
+                type="button"
+              >
+                MatchMaker
+              </button>
             </div>
           )}
 
@@ -172,6 +179,13 @@ export default function Dashboard() {
             <div className="mt-8">
               <GameHistory seasonId={selectedSeasonId} refreshKey={refreshKey} />
             </div>
+          )}
+
+          {showMatchmaking && currentSeason && (
+            <MatchmakingModal
+              seasonId={currentSeason.id}
+              onClose={() => setShowMatchmaking(false)}
+            />
           )}
         </div>
       </div>
