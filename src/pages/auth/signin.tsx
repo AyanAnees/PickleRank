@@ -52,35 +52,54 @@ export default function SignIn() {
   }, [router, pathname]);
 
   useEffect(() => {
-    // Only initialize once
-    if (recaptchaVerifierRef.current) return;
-    if (!document.getElementById('recaptcha-container')) return;
-    const verifier = new RecaptchaVerifier(
-      auth,
-      'recaptcha-container',
-      {
-        size: 'normal',
-        callback: () => {
-          setRecaptchaCompleted(true);
-          setError(null);
-        },
-        'expired-callback': () => {
-          setRecaptchaCompleted(false);
-          setError('reCAPTCHA expired. Please verify again.');
-        },
-        'error-callback': () => {
-          setRecaptchaCompleted(false);
-          setError('reCAPTCHA error. Please try again.');
-        }
+    let verifier: any;
+    const setupRecaptcha = (theme: 'light' | 'dark') => {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
       }
-    );
-    recaptchaVerifierRef.current = verifier;
-    verifier.render();
+      if (!document.getElementById('recaptcha-container')) return;
+      verifier = new RecaptchaVerifier(
+        auth,
+        'recaptcha-container',
+        {
+          size: 'normal',
+          theme,
+          callback: () => {
+            setRecaptchaCompleted(true);
+            setError(null);
+          },
+          'expired-callback': () => {
+            setRecaptchaCompleted(false);
+            setError('reCAPTCHA expired. Please verify again.');
+          },
+          'error-callback': () => {
+            setRecaptchaCompleted(false);
+            setError('reCAPTCHA error. Please try again.');
+          }
+        }
+      );
+      recaptchaVerifierRef.current = verifier;
+      verifier.render();
+    };
+
+    // Initial theme
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setupRecaptcha(isDark ? 'dark' : 'light');
+
+    // Listen for theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleThemeChange = (e: MediaQueryListEvent) => {
+      setupRecaptcha(e.matches ? 'dark' : 'light');
+    };
+    mediaQuery.addEventListener('change', handleThemeChange);
+
     return () => {
       if (recaptchaVerifierRef.current) {
         recaptchaVerifierRef.current.clear();
         recaptchaVerifierRef.current = null;
       }
+      mediaQuery.removeEventListener('change', handleThemeChange);
     };
   }, []);
 
@@ -236,10 +255,10 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white dark:bg-gray-700/80 border dark:border-gray-600 rounded-xl shadow-md p-10">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
             {isNewUser ? 'Welcome to PickleRank' : 'Sign in to PickleRank'}
           </h2>
         </div>
@@ -253,12 +272,12 @@ export default function SignIn() {
         {!verificationSent && !isNewUser && (
           <form className="mt-8 space-y-6" onSubmit={handleSendCode}>
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Phone Number
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">+1</span>
+                  <span className="text-gray-500 sm:text-sm dark:text-gray-400">+1</span>
                 </div>
                 <input
                   id="phone"
@@ -266,7 +285,7 @@ export default function SignIn() {
                   type="tel"
                   required
                   maxLength={14}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 pl-8 pr-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="mt-1 block w-full border border-gray-300 dark:border-gray-700 rounded-md shadow-sm py-2 pl-8 pr-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                   placeholder="(555) 555-5555"
                   value={phoneNumber}
                   onChange={handlePhoneNumberChange}
@@ -285,7 +304,7 @@ export default function SignIn() {
               <button
                 type="submit"
                 disabled={loading || !validatePhoneNumber(phoneNumber) || !navigator.onLine}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
                 {loading ? 'Sending...' : 'Send Code'}
               </button>
@@ -296,7 +315,7 @@ export default function SignIn() {
         {verificationSent && !isNewUser && (
           <form className="mt-8 space-y-6" onSubmit={handleVerifyCode}>
             <div>
-              <label htmlFor="code" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Verification Code
               </label>
               <input
@@ -305,7 +324,7 @@ export default function SignIn() {
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value)}
                 placeholder="Enter 6-digit code"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 required
               />
             </div>
@@ -314,7 +333,7 @@ export default function SignIn() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
                 {loading ? 'Verifying...' : 'Verify Code'}
               </button>
@@ -326,7 +345,7 @@ export default function SignIn() {
           <form className="mt-8 space-y-6" onSubmit={handleRegister}>
             <div className="space-y-4">
               <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   First Name
                 </label>
                 <input
@@ -334,13 +353,13 @@ export default function SignIn() {
                   id="firstName"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                   required
                 />
               </div>
 
               <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Last Name
                 </label>
                 <input
@@ -348,7 +367,7 @@ export default function SignIn() {
                   id="lastName"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                   required
                 />
               </div>
@@ -363,7 +382,7 @@ export default function SignIn() {
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
                 />
-                <label htmlFor="consent" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="consent" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
                   I agree to the{' '}
                   <Link href="/terms" className="text-indigo-600 hover:text-indigo-500" target="_blank">
                     Terms of Service
