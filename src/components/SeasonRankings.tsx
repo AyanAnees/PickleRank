@@ -91,20 +91,20 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
             medal = <span title="#3" className="ml-2 text-2xl">🥉</span>;
           }
           return (
-            <div key={ranking.userId} className="flex items-center justify-between p-2 bg-white rounded shadow">
+            <div key={ranking.userId} className="flex items-center justify-between p-2 bg-white dark:bg-gray-700 border dark:border-gray-600 rounded shadow transition-colors hover:bg-gray-100 dark:hover:bg-gray-600">
               <div className="flex items-center space-x-4">
-                <span className="text-lg font-semibold text-gray-600">#{index + 1}</span>
+                <span className="text-lg font-semibold text-gray-600 dark:text-gray-100">#{index + 1}</span>
                 <div className="flex items-center">
                   <button
                     onClick={() => user && setSelectedPlayer(user)}
-                    className="font-medium hover:text-indigo-600 transition-colors"
+                    className="font-medium hover:text-indigo-600 transition-colors dark:text-gray-100 dark:hover:text-indigo-400"
                   >
                     {user?.displayName || 'Unknown Player'}
                   </button>
                   {medal}
                 </div>
               </div>
-              <span className="text-lg font-semibold text-indigo-600">{ranking.currentElo}</span>
+              <span className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">{ranking.currentElo}</span>
             </div>
           );
         })}
@@ -117,21 +117,21 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
             {unranked.map((ranking) => {
               const user = users.find(u => u.id === ranking.userId);
               return (
-                <div key={ranking.userId} className="flex items-center justify-between p-2 bg-gray-50 rounded shadow">
+                <div key={ranking.userId} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 border dark:border-gray-600 rounded shadow transition-colors hover:bg-gray-100 dark:hover:bg-gray-600">
                   <div className="flex items-center space-x-4">
                     <div>
                       <button
                         onClick={() => user && setSelectedPlayer(user)}
-                        className="font-medium hover:text-indigo-600 transition-colors"
+                        className="font-medium hover:text-indigo-600 transition-colors dark:text-gray-100 dark:hover:text-indigo-400"
                       >
                         {user?.displayName || 'Unknown Player'}
                       </button>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 dark:text-gray-300">
                         {ranking.gamesPlayed} games played - {5 - ranking.gamesPlayed} more needed
                       </div>
                     </div>
                   </div>
-                  <span className="text-lg font-semibold text-gray-400">Unranked</span>
+                  <span className="text-lg font-semibold text-gray-400 dark:text-gray-200">Unranked</span>
                 </div>
               );
             })}

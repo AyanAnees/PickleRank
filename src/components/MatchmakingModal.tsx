@@ -109,7 +109,7 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
     // Sit out logic
     const numGames = Math.floor(ids.length / 4);
     const numSitOut = ids.length % 4;
-    const sitOut = ids.slice(-numSitOut);
+    const sitOut = numSitOut > 0 ? ids.slice(-numSitOut) : [];
     const playing = ids.slice(0, numGames * 4);
     const { playedWith, playedAgainst } = buildHistoryMatrices(selectedIds);
     const gamesArr: string[][][] = [];
@@ -158,7 +158,7 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-lg w-full p-6 relative">
         <button
           className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl"
           onClick={onClose}
@@ -197,7 +197,7 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
                 <button className="text-xs text-indigo-600 hover:underline" onClick={selectAll}>Select All</button>
                 <button className="text-xs text-gray-500 hover:underline" onClick={clearAll}>Clear</button>
               </div>
-              <div className="max-h-48 overflow-y-auto border rounded p-2 bg-gray-50">
+              <div className="max-h-48 overflow-y-auto border rounded p-2 bg-gray-50 dark:bg-gray-700">
                 {sortedPlayers.map(player => (
                   <label key={player.id} className="flex items-center gap-2 py-1 cursor-pointer">
                     <input
@@ -225,15 +225,15 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
               {suggested.games.length > 0 && (
                 <div className="space-y-4 mt-2">
                   {suggested.games.map((teams, i) => (
-                    <div key={i} className="border rounded p-3 bg-gray-50">
+                    <div key={i} className="border rounded p-3 bg-gray-50 dark:bg-gray-800 dark:text-gray-100">
                       <div className="font-semibold mb-1">Game {i + 1}</div>
                       <div className="flex gap-4">
                         <div>
-                          <div className="text-xs text-gray-500">Team 1</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-300">Team 1</div>
                           <div className="font-medium">{getName(teams[0][0])} & {getName(teams[0][1])}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500">Team 2</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-300">Team 2</div>
                           <div className="font-medium">{getName(teams[1][0])} & {getName(teams[1][1])}</div>
                         </div>
                       </div>
@@ -245,7 +245,7 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
                 </div>
               )}
               {suggested.games.length === 0 && canShuffle && (
-                <div className="text-gray-400 text-sm">No valid matchups found.</div>
+                <div className="text-gray-400 dark:text-gray-500 text-sm">No valid matchups found.</div>
               )}
             </div>
           </>

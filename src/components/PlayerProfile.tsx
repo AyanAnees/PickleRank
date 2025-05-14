@@ -134,7 +134,7 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 dark:text-gray-100 rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-4">
           <h2 className="text-2xl font-bold">{player.displayName}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -149,7 +149,7 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
             {/* Fun Stats (moved to top) */}
             <div className="grid grid-cols-2 gap-4 mb-4">
               {nemesis && nemesis[1].losses > 0 && (
-                <div className="p-3 bg-red-50 rounded">
+                <div className="p-3 bg-red-50 dark:bg-red-700/20 dark:text-red-200 rounded">
                   <div className="flex items-center mb-1">
                     <h4 className="font-medium text-red-700">Nemesis</h4>
                     <InfoTooltip text="Your Nemesis is the player who has beaten you by the largest margin (losses minus wins) this season." />
@@ -160,7 +160,7 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
                 </div>
               )}
               {bestPartner && (
-                <div className="p-3 bg-green-50 rounded">
+                <div className="p-3 bg-green-50 dark:bg-green-700/20 dark:text-green-200 rounded">
                   <div className="flex items-center mb-1">
                     <h4 className="font-medium text-green-700">Best Partner</h4>
                     <InfoTooltip text="Your Best Partner is the teammate you have the highest win rate with (minimum 1 game together) this season." />
@@ -178,9 +178,9 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
                 {Object.entries(stats.headToHead)
                   .sort(([, a], [, b]) => b.games - a.games)
                   .map(([opponentId, record]) => (
-                    <div key={opponentId} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <span className="font-medium">{getDisplayName(opponentId)}</span>
-                      <span className="text-sm text-gray-600">
+                    <div key={opponentId} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                      <span className="font-medium dark:text-gray-100">{getDisplayName(opponentId)}</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
                         {record.wins}W - {record.losses}L ({record.games} games)
                       </span>
                     </div>
@@ -195,9 +195,9 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
                 {Object.entries(stats.partners)
                   .sort(([, a], [, b]) => b.games - a.games)
                   .map(([partnerId, record]) => (
-                    <div key={partnerId} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <span className="font-medium">{getDisplayName(partnerId)}</span>
-                      <span className="text-sm text-gray-600">
+                    <div key={partnerId} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                      <span className="font-medium dark:text-gray-100">{getDisplayName(partnerId)}</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
                         {record.wins}W - {record.losses}L ({record.games} games)
                       </span>
                     </div>

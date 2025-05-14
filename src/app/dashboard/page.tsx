@@ -67,14 +67,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
             <div className="flex items-center gap-4">
               {currentSeason && (
-                <div className="text-lg text-gray-600">{currentSeason.name}</div>
+                <div className="text-lg text-gray-600 dark:text-gray-300">{currentSeason.name}</div>
               )}
               <button
                 onClick={async () => {
@@ -85,7 +85,7 @@ export default function Dashboard() {
                     console.error('Error signing out:', error);
                   }
                 }}
-                className="text-sm text-gray-600 hover:text-gray-900"
+                className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
               >
                 Sign Out
               </button>
@@ -95,7 +95,7 @@ export default function Dashboard() {
           {/* Season Selector */}
           {seasons.length > 0 && (
             <div className="mb-4">
-              <label htmlFor="season-select" className="block text-sm font-medium text-gray-700 mb-1">Select Season</label>
+              <label htmlFor="season-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Season</label>
               <select
                 id="season-select"
                 className="input-field w-full max-w-xs"
@@ -109,7 +109,7 @@ export default function Dashboard() {
                 ))}
               </select>
               <button
-                className="text-indigo-600 hover:underline text-sm font-medium mt-2 focus:outline-none"
+                className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm font-medium mt-2 focus:outline-none"
                 onClick={() => setShowMatchmaking(true)}
                 type="button"
               >
@@ -126,8 +126,8 @@ export default function Dashboard() {
                 const daysUntilEnd = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
                 if (daysUntilEnd <= 14 && daysUntilEnd > 0) {
                   return (
-                    <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
-                      <p className="text-yellow-700">
+                    <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 dark:border-yellow-700 rounded">
+                      <p className="text-yellow-700 dark:text-yellow-200">
                         {currentSeason.name} wraps up in {daysUntilEnd} {daysUntilEnd === 1 ? 'day' : 'days'}. 
                         Last chance to get your games in picklers
                       </p>
@@ -140,15 +140,15 @@ export default function Dashboard() {
           )}
 
           {selectedSeasonId && (
-            <div className="bg-white rounded-lg shadow">
-              <div className="border-b border-gray-200">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+              <div className="border-b border-gray-200 dark:border-gray-700">
                 <nav className="flex -mb-px">
                   <button
                     onClick={() => setActiveTab('game')}
                     className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                       activeTab === 'game'
-                        ? 'border-indigo-500 text-indigo-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     Enter Game
@@ -157,8 +157,8 @@ export default function Dashboard() {
                     onClick={() => setActiveTab('rankings')}
                     className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
                       activeTab === 'rankings'
-                        ? 'border-indigo-500 text-indigo-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     Current Rankings

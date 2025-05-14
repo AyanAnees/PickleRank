@@ -32,19 +32,19 @@ export default function RankingsExplained() {
 
         <h2 className="text-xl font-semibold mt-8 mb-4">Example Scenarios</h2>
         <div className="space-y-4 mb-6">
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="bg-gray-50 dark:bg-gray-800 dark:text-gray-100 p-4 rounded-lg">
             <h3 className="font-semibold mb-2">Close Game (11-9)</h3>
             <p>• Winner gains a small amount of ELO<br />
                • Loser loses a small amount of ELO</p>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="bg-gray-50 dark:bg-gray-800 dark:text-gray-100 p-4 rounded-lg">
             <h3 className="font-semibold mb-2">Blowout (11-2)</h3>
             <p>• Winner gains a larger amount of ELO<br />
                • Loser loses a larger amount of ELO</p>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="bg-gray-50 dark:bg-gray-800 dark:text-gray-100 p-4 rounded-lg">
             <h3 className="font-semibold mb-2">Underdog Wins (1400 vs 1600, 11-7)</h3>
             <p>• Winner gains even more ELO for beating a higher-rated team<br />
                • Loser loses more ELO</p>

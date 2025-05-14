@@ -135,7 +135,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
   }
 
   return (
-    <div className="card space-y-4">
+    <div className="card space-y-4 dark:bg-gray-800">
       <h3 className="text-xl font-semibold">Game History</h3>
       <div className="space-y-4">
         {games.slice(0, showCount).map((game) => {
@@ -151,7 +151,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
           const winnerTrophy = team1Won ? team1Won : team2Won;
 
           return (
-            <div key={game.id} className="border rounded-lg p-4 bg-white shadow-sm relative">
+            <div key={game.id} className="border rounded-lg p-4 bg-white dark:bg-gray-900 shadow-sm relative border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1">
                   {/* Winner on top, loser below */}
@@ -160,17 +160,17 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                       <span className="mr-1">🏆</span>
                       {winner.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
                     </div>
-                    <div className="my-1 text-xs text-gray-500 flex items-center">
+                    <div className="my-1 text-xs text-gray-500 dark:text-gray-300 flex items-center">
                       <span className="mx-2">Score: {winnerScore} - {loserScore}</span>
-                      <span className="mx-2 text-gray-300">|</span>
-                      <span className="mx-2 text-gray-400">±{game.eloChange} ELO</span>
+                      <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
+                      <span className="mx-2 text-gray-400 dark:text-gray-400">±{game.eloChange} ELO</span>
                     </div>
                     <div className={'font-medium mt-1'}>
                       {loser.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
                     </div>
                   </div>
                   {game.recordedBy?.name && (
-                    <div className="mt-1 text-xs text-gray-500">
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Recorded by {game.recordedBy.name}
                     </div>
                   )}
@@ -183,7 +183,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                 )}
               </div>
               {gameTime && (
-                <div className="absolute bottom-2 left-4 text-[10px] text-gray-400 text-left">
+                <div className="absolute bottom-2 left-4 text-[10px] text-gray-400 dark:text-gray-500 text-left">
                   {gameTime.full}
                   <span className="ml-1">({gameTime.relative})</span>
                 </div>
