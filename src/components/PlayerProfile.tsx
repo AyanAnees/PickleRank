@@ -123,9 +123,10 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
     return users.find(u => u.id === id)?.displayName || id;
   };
 
-  // Find nemesis (player who beats them most)
+  // Find nemesis (player who beats them most by margin, only if you have actually lost to them)
   const nemesis = Object.entries(stats.headToHead)
-    .sort(([, a], [, b]) => (b.wins - b.losses) - (a.wins - a.losses))[0];
+    .filter(([, record]) => record.losses > 0)
+    .sort(([, a], [, b]) => (b.losses - b.wins) - (a.losses - a.wins))[0];
 
   // Find best partner
   const bestPartner = Object.entries(stats.partners)
@@ -147,11 +148,11 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
           <div className="space-y-6">
             {/* Fun Stats (moved to top) */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-              {nemesis && (
+              {nemesis && nemesis[1].losses > 0 && (
                 <div className="p-3 bg-red-50 rounded">
                   <div className="flex items-center mb-1">
                     <h4 className="font-medium text-red-700">Nemesis</h4>
-                    <InfoTooltip text="Your Nemesis is the player who has beaten you the most times this season. Calculated by counting losses against each opponent." />
+                    <InfoTooltip text="Your Nemesis is the player who has beaten you by the largest margin (losses minus wins) this season." />
                   </div>
                   <p className="text-sm text-red-600">
                     {getDisplayName(nemesis[0])} ({nemesis[1].wins}W - {nemesis[1].losses}L)
