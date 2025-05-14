@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     description: 'Shaheer is not here is he',
     images: [
       {
-        url: '/og-image.png',
+        url: 'https://pickle-rank.vercel.app/og-image.png',
         width: 1200,
         height: 630,
         alt: 'PickleRank',
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'PickleRank - Go PICKLEHEADS',
     description: 'Cypress boyyyyyssss',
-    images: ['/og-image.png'],
+    images: ['https://pickle-rank.vercel.app/og-image.png'],
   },
 };
 
@@ -40,6 +40,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <meta property="og:image" content="https://pickle-rank.vercel.app/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content="https://pickle-rank.vercel.app/og-image.png" />
+      </head>
       <body className={`${inter.className} bg-background dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100`}>
         <AuthProvider>
           <ThemeSync />

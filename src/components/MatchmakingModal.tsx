@@ -197,7 +197,7 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
                 <button className="text-xs text-indigo-600 hover:underline" onClick={selectAll}>Select All</button>
                 <button className="text-xs text-gray-500 hover:underline" onClick={clearAll}>Clear</button>
               </div>
-              <div className="max-h-48 overflow-y-auto border rounded p-2 bg-gray-50 dark:bg-gray-700">
+              <div className="max-h-48 overflow-y-auto border rounded p-2 bg-gray-50 dark:bg-gray-800 dark:border-gray-600">
                 {sortedPlayers.map(player => (
                   <label key={player.id} className="flex items-center gap-2 py-1 cursor-pointer">
                     <input
@@ -225,16 +225,16 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
               {suggested.games.length > 0 && (
                 <div className="space-y-4 mt-2">
                   {suggested.games.map((teams, i) => (
-                    <div key={i} className="border rounded p-3 bg-gray-50 dark:bg-gray-800 dark:text-gray-100">
-                      <div className="font-semibold mb-1">Game {i + 1}</div>
+                    <div key={i} className="border rounded p-3 bg-gray-50 dark:bg-gray-800 dark:border-gray-600 shadow-md">
+                      <div className="font-semibold mb-1 dark:text-gray-100">Game {i + 1}</div>
                       <div className="flex gap-4">
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-300">Team 1</div>
-                          <div className="font-medium">{getName(teams[0][0])} & {getName(teams[0][1])}</div>
+                          <div className="font-medium dark:text-gray-100">{getName(teams[0][0])} & {getName(teams[0][1])}</div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-300">Team 2</div>
-                          <div className="font-medium">{getName(teams[1][0])} & {getName(teams[1][1])}</div>
+                          <div className="font-medium dark:text-gray-100">{getName(teams[1][0])} & {getName(teams[1][1])}</div>
                         </div>
                       </div>
                     </div>
