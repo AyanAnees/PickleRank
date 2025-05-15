@@ -30,6 +30,8 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
   const [suggested, setSuggested] = useState<{ games: string[][][], sitOut: string[] }>({ games: [], sitOut: [] });
   const [shuffles, setShuffles] = useState(0);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [isVarietyMode, setIsVarietyMode] = useState(true); // Default to variety mode
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // Track if this is the first load
 
   useEffect(() => {
     const fetchPlayersAndGames = async () => {
@@ -54,11 +56,26 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
   }, [seasonId]);
 
   const togglePlayer = (id: string) => {
-    setSelected(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]);
+    setSelected(sel => {
+      const newSelection = sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id];
+      // Reset shuffle count when selection changes
+      setShuffles(0);
+      setIsInitialLoad(true);
+      return newSelection;
+    });
   };
 
-  const selectAll = () => setSelected(players.map(p => p.id));
-  const clearAll = () => setSelected([]);
+  const selectAll = () => {
+    setSelected(players.map(p => p.id));
+    setShuffles(0);
+    setIsInitialLoad(true);
+  };
+  
+  const clearAll = () => {
+    setSelected([]);
+    setShuffles(0);
+    setIsInitialLoad(true);
+  };
 
   // Alphabetize players by displayName
   const sortedPlayers = [...players].sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -101,38 +118,94 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
     return { playedWith, playedAgainst };
   }
 
-  // Main matchmaking logic
+  // Calculate ELO difference between teams
+  function calculateEloDifference(team1: string[], team2: string[]): number {
+    const team1Elo = team1.reduce((sum, id) => {
+      const player = players.find(p => p.id === id);
+      return sum + (player?.elo || 1500);
+    }, 0) / 2;
+    const team2Elo = team2.reduce((sum, id) => {
+      const player = players.find(p => p.id === id);
+      return sum + (player?.elo || 1500);
+    }, 0) / 2;
+    return Math.abs(team1Elo - team2Elo);
+  }
+
+  // Fisher-Yates shuffle implementation
+  function shuffleArray<T>(array: T[]): T[] {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  }
+
   function suggestMatchups(selectedIds: string[]) {
     if (selectedIds.length < 4) return { games: [], sitOut: [] };
+    
+    // Calculate algorithm weight based on whether it's initial load or shuffles
+    let algorithmWeight: number;
+    if (isInitialLoad) {
+      algorithmWeight = 1; // 100% on initial load
+    } else {
+      // First shuffle reduces by 30%, then each subsequent shuffle reduces by 30% more
+      algorithmWeight = Math.max(0, 1 - (shuffles * 0.3));
+    }
+    
     // Shuffle selectedIds for randomness
     const ids = [...selectedIds].sort(() => Math.random() - 0.5);
+    
     // Sit out logic
     const numGames = Math.floor(ids.length / 4);
     const numSitOut = ids.length % 4;
     const sitOut = numSitOut > 0 ? ids.slice(-numSitOut) : [];
     const playing = ids.slice(0, numGames * 4);
+    
     const { playedWith, playedAgainst } = buildHistoryMatrices(selectedIds);
     const gamesArr: string[][][] = [];
+    
     for (let g = 0; g < numGames; g++) {
-      const group = playing.slice(g * 4, g * 4 + 4);
-      // Generate all possible team splits
+      const startIdx = g * 4;
+      const group = playing.slice(startIdx, startIdx + 4);
+      
+      // If algorithm weight is low enough, just pick random teams
+      if (algorithmWeight < 0.3) {
+        const shuffledGroup = [...group].sort(() => Math.random() - 0.5);
+        gamesArr.push([shuffledGroup.slice(0, 2), shuffledGroup.slice(2)]);
+        continue;
+      }
+      
+      // Otherwise, use the algorithm
       const combos = getCombinations(group, 2);
       let bestScore = Infinity;
       let bestTeams: string[][] = [];
-      for (const team1 of combos) {
+      
+      // Shuffle the combinations to add more randomness
+      const shuffledCombos = [...combos].sort(() => Math.random() - 0.5);
+      
+      for (const team1 of shuffledCombos) {
         const team2 = group.filter(x => !team1.includes(x));
-        // Score: sum of playedWith for teammates + playedAgainst for opponents
-        const score =
-          playedWith[team1[0]][team1[1]] +
-          playedWith[team2[0]][team2[1]] +
-          playedAgainst[team1[0]][team2[0]] +
-          playedAgainst[team1[0]][team2[1]] +
-          playedAgainst[team1[1]][team2[0]] +
-          playedAgainst[team1[1]][team2[1]] +
-          playedAgainst[team2[0]][team1[0]] +
-          playedAgainst[team2[0]][team1[1]] +
-          playedAgainst[team2[1]][team1[0]] +
-          playedAgainst[team2[1]][team1[1]];
+        
+        let score: number;
+        if (isVarietyMode) {
+          // Variety mode: minimize games played together/against
+          score = algorithmWeight * (
+            playedWith[team1[0]][team1[1]] +
+            playedWith[team2[0]][team2[1]] +
+            playedAgainst[team1[0]][team2[0]] +
+            playedAgainst[team1[0]][team2[1]] +
+            playedAgainst[team1[1]][team2[0]] +
+            playedAgainst[team1[1]][team2[1]]
+          );
+        } else {
+          // Fair mode: minimize ELO difference between teams
+          score = algorithmWeight * calculateEloDifference(team1, team2);
+        }
+        
+        // Add randomization factor - make it more impactful
+        score += (1 - algorithmWeight) * (Math.random() * 2000);
+        
         if (score < bestScore) {
           bestScore = score;
           bestTeams = [team1, team2];
@@ -150,8 +223,15 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
     } else {
       setSuggested({ games: [], sitOut: [] });
     }
-    // eslint-disable-next-line
-  }, [shuffles, selected, games]);
+  }, [shuffles, selected, games, isVarietyMode, isInitialLoad]);
+
+  // Handle shuffle button click
+  const handleShuffle = () => {
+    setIsInitialLoad(false); // Mark that we're no longer in initial load
+    setShuffles(s => s + 1);
+    // Force a re-render by updating the suggested state
+    setSuggested(prev => ({ ...prev }));
+  };
 
   // Helper to get display name
   const getName = (id: string) => players.find(p => p.id === id)?.displayName || id;
@@ -182,12 +262,39 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01" />
             </svg>
             {showTooltip && (
-              <div className="absolute z-50 left-1/2 -translate-x-1/2 mt-2 w-64 p-2 bg-white border border-gray-200 rounded shadow text-xs text-gray-700">
-                Teams are suggested to maximize variety—players are paired with and against those they've played with the least. If there are extra players, sit-outs are rotated so everyone gets a turn. Don't cry. You can always hit the Shuffle button for a new suggestion.
+              <div className="absolute z-50 left-1/2 -translate-x-1/2 mt-2 w-72 p-2 bg-white border border-gray-200 rounded shadow text-xs text-gray-700">
+                <b>Variety Mode:</b> Teams are suggested to maximize variety—players are paired with and against those they've played with the least.<br /><br />
+                <b>Fair Mode:</b> Teams are suggested to create the most balanced matches based on ELO ratings.<br /><br />
+                Each shuffle reduces the algorithm's influence, making teams more random.
               </div>
             )}
           </span>
         </h2>
+
+        {/* Mode Segmented Control */}
+        <div className="mb-4 flex items-center justify-center">
+          <div className="inline-flex rounded-full bg-gray-100 dark:bg-gray-700 p-1 border border-gray-300 dark:border-gray-600">
+            <button
+              type="button"
+              onClick={() => setIsVarietyMode(true)}
+              className={`px-4 py-1 rounded-full text-sm font-semibold focus:outline-none transition-colors duration-150
+                ${isVarietyMode ? 'bg-indigo-600 text-white shadow' : 'bg-transparent text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+              aria-pressed={isVarietyMode}
+            >
+              Variety
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsVarietyMode(false)}
+              className={`px-4 py-1 rounded-full text-sm font-semibold focus:outline-none transition-colors duration-150
+                ${!isVarietyMode ? 'bg-indigo-600 text-white shadow' : 'bg-transparent text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+              aria-pressed={!isVarietyMode}
+            >
+              Fair
+            </button>
+          </div>
+        </div>
+
         {loading ? (
           <div className="text-gray-500">Loading players...</div>
         ) : (
@@ -215,7 +322,7 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
               <button
                 className="text-sm text-indigo-600 hover:underline mb-2 disabled:text-gray-300 disabled:cursor-not-allowed"
                 disabled={!canShuffle}
-                onClick={() => setShuffles(s => s + 1)}
+                onClick={handleShuffle}
               >
                 Shuffle
               </button>
@@ -253,4 +360,4 @@ export default function MatchmakingModal({ seasonId, onClose }: MatchmakingModal
       </div>
     </div>
   );
-} 
+}
