@@ -123,14 +123,31 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
     return users.find(u => u.id === id)?.displayName || id;
   };
 
-  // Find nemesis (player who beats them most by margin, only if you have actually lost to them)
-  const nemesis = Object.entries(stats.headToHead)
-    .filter(([, record]) => record.losses > 0)
-    .sort(([, a], [, b]) => (b.losses - b.wins) - (a.losses - a.wins))[0];
+  // Find all nemeses (players who beat them most by margin, only if you have actually lost to them)
+  const nemesisEntries = Object.entries(stats.headToHead)
+    .filter(([, record]) => record.losses > 0);
 
-  // Find best partner
-  const bestPartner = Object.entries(stats.partners)
-    .sort(([, a], [, b]) => (b.wins / b.games) - (a.wins / a.games))[0];
+  let nemesisList: [string, typeof nemesisEntries[0][1]][] = [];
+  if (nemesisEntries.length > 0) {
+    const maxNemesisScore = Math.max(...nemesisEntries.map(([, r]) => r.losses - r.wins));
+    const maxScoreEntries = nemesisEntries.filter(([, r]) => (r.losses - r.wins) === maxNemesisScore);
+    if (maxScoreEntries.length > 0) {
+      const maxGames = Math.max(...maxScoreEntries.map(([, r]) => r.games));
+      nemesisList = maxScoreEntries.filter(([, r]) => r.games === maxGames);
+    }
+  }
+
+  // Find all best partners (highest win rate, min 1 game, tiebreaker: most games played)
+  const partnerEntries = Object.entries(stats.partners).filter(([, r]) => r.games > 0);
+  let bestPartnerList: [string, typeof partnerEntries[0][1]][] = [];
+  if (partnerEntries.length > 0) {
+    const maxWinRate = Math.max(...partnerEntries.map(([, r]) => r.wins / r.games));
+    const maxRateEntries = partnerEntries.filter(([, r]) => (r.wins / r.games) === maxWinRate);
+    if (maxRateEntries.length > 0) {
+      const maxGames = Math.max(...maxRateEntries.map(([, r]) => r.games));
+      bestPartnerList = maxRateEntries.filter(([, r]) => r.games === maxGames);
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -148,26 +165,30 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
           <div className="space-y-6">
             {/* Fun Stats (moved to top) */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-              {nemesis && nemesis[1].losses > 0 && (
+              {nemesisList.length > 0 && (
                 <div className="p-3 bg-red-50 dark:bg-red-700/20 dark:text-red-200 rounded">
                   <div className="flex items-center mb-1">
                     <h4 className="font-medium text-red-700">Nemesis</h4>
-                    <InfoTooltip text="Your Nemesis is the player who has beaten you by the largest margin (losses minus wins) this season." />
+                    <InfoTooltip text="Your Nemesis is the player who has beaten you by the largest margin (losses minus wins) this season. If there is a tie, the tiebreaker is the number of games played against you." />
                   </div>
-                  <p className="text-sm text-red-600">
-                    {getDisplayName(nemesis[0])} ({nemesis[1].wins}W - {nemesis[1].losses}L)
-                  </p>
+                  {nemesisList.map(([id, rec]) => (
+                    <p key={id} className="text-sm text-red-600">
+                      {getDisplayName(id)} ({rec.wins}W - {rec.losses}L)
+                    </p>
+                  ))}
                 </div>
               )}
-              {bestPartner && (
+              {bestPartnerList.length > 0 && (
                 <div className="p-3 bg-green-50 dark:bg-green-700/20 dark:text-green-200 rounded">
                   <div className="flex items-center mb-1">
                     <h4 className="font-medium text-green-700">Best Partner</h4>
-                    <InfoTooltip text="Your Best Partner is the teammate you have the highest win rate with (minimum 1 game together) this season." />
+                    <InfoTooltip text="Your Best Partner is the teammate you have the highest win rate with (minimum 1 game together) this season. If there is a tie, the tiebreaker is the number of games played together." />
                   </div>
-                  <p className="text-sm text-green-600">
-                    {getDisplayName(bestPartner[0])} ({bestPartner[1].wins}W - {bestPartner[1].losses}L)
-                  </p>
+                  {bestPartnerList.map(([id, rec]) => (
+                    <p key={id} className="text-sm text-green-600">
+                      {getDisplayName(id)} ({rec.wins}W - {rec.losses}L)
+                    </p>
+                  ))}
                 </div>
               )}
             </div>

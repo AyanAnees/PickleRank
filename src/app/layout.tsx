@@ -14,11 +14,11 @@ export const metadata: Metadata = {
     icon: '/favicon.ico',
   },
   openGraph: {
-    title: 'PickleRank - Go PICKLEHEADS',
+    title: 'SHAHEER COME HOME',
     description: 'Shaheer is not here is he',
     images: [
       {
-        url: 'https://pickle-rank.vercel.app/og-image.png',
+        url: 'https://pickle-rank.vercel.app/yoyo.png',
         width: 1200,
         height: 630,
         alt: 'PickleRank',
