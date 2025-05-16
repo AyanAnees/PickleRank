@@ -149,11 +149,26 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
     }
   }
 
+  // Calculate win rate for the season
+  const seasonStats = player.seasonStats?.[seasonId];
+  const wins = seasonStats?.wins || 0;
+  const losses = seasonStats?.losses || 0;
+  const gamesPlayed = seasonStats?.gamesPlayed || 0;
+  const winRate = gamesPlayed > 0 ? (wins / gamesPlayed) : 0;
+  const winRatePercent = (winRate * 100).toFixed(0);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 dark:text-gray-100 rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-4">
-          <h2 className="text-2xl font-bold">{player.displayName}</h2>
+          <div>
+            <h2 className="text-2xl font-bold">{player.displayName}</h2>
+            <div className="text-sm text-gray-400 dark:text-gray-400 font-semibold mt-1 mb-2 tracking-wide uppercase">Season Stats</div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded font-semibold">Win Rate: {winRatePercent}%</span>
+              <span className="text-xs text-gray-500 dark:text-gray-300">({wins}W / {losses}L)</span>
+            </div>
+          </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             ✕
           </button>
