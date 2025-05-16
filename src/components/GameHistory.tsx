@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { User } from '../types';
 import { Game } from '@/types';
 import { formatDistanceToNow, format } from 'date-fns';
+import PlayerProfile from './PlayerProfile';
 
 interface GameHistoryProps {
   seasonId: string;
@@ -27,6 +28,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [showCount, setShowCount] = useState(3);
+  const [selectedPlayer, setSelectedPlayer] = useState<User | null>(null);
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -150,6 +152,23 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
           const loserScore = team1Won ? game.team2.score : game.team1.score;
           const winnerTrophy = team1Won ? team1Won : team2Won;
 
+          // Helper to render player name as clickable
+          const renderPlayerName = (p: User | string) => {
+            const id = typeof p === 'string' ? p : p.id;
+            const userObj = users.find(u => u.id === id);
+            const displayName = typeof p === 'string' ? getUserName(p) : p.displayName;
+            return (
+              <button
+                key={id}
+                className="hover:underline font-medium px-0.5"
+                onClick={() => userObj && setSelectedPlayer(userObj)}
+                type="button"
+              >
+                {displayName}
+              </button>
+            );
+          };
+
           return (
             <div key={game.id} className="border rounded-lg p-4 bg-white dark:bg-gray-900 shadow-sm relative border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-start mb-2">
@@ -158,7 +177,9 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                   <div className="flex flex-col items-center">
                     <div className={'font-bold text-green-700 flex items-center mb-1'}>
                       <span className="mr-1">🏆</span>
-                      {winner.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
+                      {winner.players
+                        .map(renderPlayerName)
+                        .flatMap((el, i, arr) => i < arr.length - 1 ? [el, ' & '] : [el])}
                     </div>
                     <div className="my-1 text-xs text-gray-500 dark:text-gray-300 flex items-center">
                       <span className="mx-2">Score: {winnerScore} - {loserScore}</span>
@@ -166,7 +187,9 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                       <span className="mx-2 text-gray-400 dark:text-gray-400">±{game.eloChange} ELO</span>
                     </div>
                     <div className={'font-medium mt-1'}>
-                      {loser.players.map(p => typeof p === 'string' ? p : p.displayName).join(' & ')}
+                      {loser.players
+                        .map(renderPlayerName)
+                        .flatMap((el, i, arr) => i < arr.length - 1 ? [el, ' & '] : [el])}
                     </div>
                   </div>
                   {game.recordedBy?.name && (
@@ -200,6 +223,13 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
           </button>
         )}
       </div>
+      {selectedPlayer && (
+        <PlayerProfile
+          player={selectedPlayer}
+          seasonId={seasonId}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 } 
