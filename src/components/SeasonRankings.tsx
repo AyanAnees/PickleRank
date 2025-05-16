@@ -89,6 +89,8 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
             medal = <span title="#2" className="ml-2 text-2xl">🥈</span>;
           } else if (index === 2) {
             medal = <span title="#3" className="ml-2 text-2xl">🥉</span>;
+          } else if (index === rankings.length - 1) {
+            medal = <span title="Last Place" className="ml-2 text-2xl">🤡</span>;
           }
           return (
             <div key={ranking.userId} className="flex items-center justify-between p-2 bg-white dark:bg-gray-700 border dark:border-gray-600 rounded shadow transition-colors hover:bg-gray-100 dark:hover:bg-gray-600">
