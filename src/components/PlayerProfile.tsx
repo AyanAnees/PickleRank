@@ -230,14 +230,21 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
               <div className="space-y-2">
                 {Object.entries(stats.partners)
                   .sort(([, a], [, b]) => b.games - a.games)
-                  .map(([partnerId, record]) => (
-                    <div key={partnerId} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                      <span className="font-medium dark:text-gray-100">{getDisplayName(partnerId)}</span>
-                      <span className="text-sm text-gray-600 dark:text-gray-300">
-                        {record.wins}W - {record.losses}L ({record.games} games)
-                      </span>
-                    </div>
-                  ))}
+                  .map(([partnerId, record]) => {
+                    const winRate = record.games > 0 ? (record.wins / record.games) : 0;
+                    const winRatePercent = (winRate * 100).toFixed(0);
+                    return (
+                      <div key={partnerId} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                        <span className="font-medium dark:text-gray-100 flex items-center gap-2">
+                          {getDisplayName(partnerId)}
+                          <span className="text-[11px] text-indigo-600 dark:text-indigo-300 font-semibold">{winRatePercent}%</span>
+                        </span>
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          {record.wins}W - {record.losses}L ({record.games} games)
+                        </span>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           </div>
