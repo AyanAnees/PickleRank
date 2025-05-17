@@ -136,6 +136,34 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
     );
   }
 
+  // --- HOT STREAK LOGIC ---
+  // Build a map: { [gameId]: { [playerId]: streakCountIf3OrMore } }
+  const streaksByGame: Record<string, Record<string, number>> = {};
+  const streaks: Record<string, number> = {};
+  // Sort games oldest to newest
+  const gamesChrono = [...games].sort((a, b) => new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime());
+  for (const game of gamesChrono) {
+    const team1Won = game.team1.score > game.team2.score;
+    const team2Won = game.team2.score > game.team1.score;
+    const winner = team1Won ? game.team1 : game.team2;
+    const loser = team1Won ? game.team2 : game.team1;
+    streaksByGame[game.id] = {};
+    // Winners: increment streak
+    for (const p of winner.players) {
+      const pid = typeof p === 'string' ? p : p.id;
+      streaks[pid] = (streaks[pid] || 0) + 1;
+      if (streaks[pid] >= 3) {
+        streaksByGame[game.id][pid] = streaks[pid];
+      }
+    }
+    // Losers: reset streak
+    for (const p of loser.players) {
+      const pid = typeof p === 'string' ? p : p.id;
+      streaks[pid] = 0;
+    }
+  }
+  // --- END HOT STREAK LOGIC ---
+
   return (
     <div className="card space-y-4 dark:bg-gray-800">
       <h3 className="text-xl font-semibold">Game History</h3>
@@ -152,22 +180,42 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
           const loserScore = team1Won ? game.team2.score : game.team1.score;
           const winnerTrophy = team1Won ? team1Won : team2Won;
 
-          // Helper to render player name as clickable
+          // Helper to render player name as clickable, stacked first/last name, with hot streak below
           const renderPlayerName = (p: User | string) => {
             const id = typeof p === 'string' ? p : p.id;
             const userObj = users.find(u => u.id === id);
             const displayName = typeof p === 'string' ? getUserName(p) : p.displayName;
+            const streak = streaksByGame[game.id]?.[id];
+            // Split name into first and last (handles middle names)
+            const [firstName, ...rest] = displayName.split(' ');
+            const lastName = rest.join(' ');
             return (
               <button
                 key={id}
-                className="hover:underline font-medium px-0.5"
+                className="hover:underline font-medium px-0.5 flex flex-col items-center"
                 onClick={() => userObj && setSelectedPlayer(userObj)}
                 type="button"
               >
-                {displayName}
+                <span>{firstName}</span>
+                <span>{lastName}</span>
+                {streak && (
+                  <span className="mt-0.5 text-orange-500 flex items-center text-xs font-bold align-middle">🔥<span className="ml-0.5">{streak}</span></span>
+                )}
               </button>
             );
           };
+
+          // Helper to render a team as a flex row with & centered
+          const renderTeam = (players: (User | string)[]) => (
+            <div className="flex flex-row items-center gap-2">
+              {players.map((p, i) => (
+                <React.Fragment key={typeof p === 'string' ? p : p.id}>
+                  {renderPlayerName(p)}
+                  {i < players.length - 1 && <span className="mx-1 font-bold text-lg">&</span>}
+                </React.Fragment>
+              ))}
+            </div>
+          );
 
           return (
             <div key={game.id} className="border rounded-lg p-4 bg-white dark:bg-gray-900 shadow-sm relative border-gray-200 dark:border-gray-700">
@@ -177,9 +225,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                   <div className="flex flex-col items-center">
                     <div className={'font-bold text-green-700 flex items-center mb-1'}>
                       <span className="mr-1">🏆</span>
-                      {winner.players
-                        .map(renderPlayerName)
-                        .flatMap((el, i, arr) => i < arr.length - 1 ? [el, ' & '] : [el])}
+                      {renderTeam(winner.players)}
                     </div>
                     <div className="my-1 text-xs text-gray-500 dark:text-gray-300 flex items-center">
                       <span className="mx-2">Score: {winnerScore} - {loserScore}</span>
@@ -187,9 +233,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                       <span className="mx-2 text-gray-400 dark:text-gray-400">±{game.eloChange} ELO</span>
                     </div>
                     <div className={'font-medium mt-1'}>
-                      {loser.players
-                        .map(renderPlayerName)
-                        .flatMap((el, i, arr) => i < arr.length - 1 ? [el, ' & '] : [el])}
+                      {renderTeam(loser.players)}
                     </div>
                   </div>
                   {game.recordedBy?.name && (
