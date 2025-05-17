@@ -83,28 +83,33 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
         {rankings.map((ranking, index) => {
           const user = users.find(u => u.id === ranking.userId);
           let medal = null;
+          let showRank = true;
           if (index === 0) {
-            medal = <span title="#1" className="ml-2 text-2xl">🥇</span>;
+            medal = <span title="#1" className="w-8 inline-block text-2xl text-center">🥇</span>;
+            showRank = false;
           } else if (index === 1) {
-            medal = <span title="#2" className="ml-2 text-2xl">🥈</span>;
+            medal = <span title="#2" className="w-8 inline-block text-2xl text-center">🥈</span>;
+            showRank = false;
           } else if (index === 2) {
-            medal = <span title="#3" className="ml-2 text-2xl">🥉</span>;
+            medal = <span title="#3" className="w-8 inline-block text-2xl text-center">🥉</span>;
+            showRank = false;
           } else if (index === rankings.length - 1) {
-            medal = <span title="Last Place" className="ml-2 text-2xl">🤡</span>;
+            medal = <span title="Last Place" className="w-8 inline-block text-2xl text-center">🤡</span>;
+            showRank = false;
           }
           return (
             <div key={ranking.userId} className="flex items-center justify-between p-2 bg-white dark:bg-gray-700 border dark:border-gray-600 rounded shadow transition-colors hover:bg-gray-100 dark:hover:bg-gray-600">
               <div className="flex items-center space-x-4">
-                <span className="text-lg font-semibold text-gray-600 dark:text-gray-100">#{index + 1}</span>
-                <div className="flex items-center">
-                  <button
-                    onClick={() => user && setSelectedPlayer(user)}
-                    className="font-medium hover:text-indigo-600 transition-colors dark:text-gray-100 dark:hover:text-indigo-400"
-                  >
-                    {user?.displayName || 'Unknown Player'}
-                  </button>
-                  {medal}
-                </div>
+                {medal}
+                {showRank && (
+                  <span className="text-lg font-semibold text-gray-600 dark:text-gray-100">#{index + 1}</span>
+                )}
+                <button
+                  onClick={() => user && setSelectedPlayer(user)}
+                  className="font-medium hover:text-indigo-600 transition-colors dark:text-gray-100 dark:hover:text-indigo-400 ml-2"
+                >
+                  {user?.displayName || 'Unknown Player'}
+                </button>
               </div>
               <span className="text-lg font-semibold text-indigo-600 dark:text-indigo-400">{ranking.currentElo}</span>
             </div>
