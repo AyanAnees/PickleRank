@@ -57,6 +57,7 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<PlayerStats>({ headToHead: {}, partners: {} });
   const [loading, setLoading] = useState(true);
+  const [hotStreaks, setHotStreaks] = useState<{ max: number; current: number }>({ max: 0, current: 0 });
 
   useEffect(() => {
     const fetchGamesAndUsers = async () => {
@@ -76,8 +77,8 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
         const newStats: PlayerStats = { headToHead: {}, partners: {} };
         
         gamesData.forEach((game: Game) => {
-          const isTeam1 = game.team1.players.some(p => p.id === player.id);
-          const isTeam2 = game.team2.players.some(p => p.id === player.id);
+          const isTeam1 = game.team1.players.some((p: any) => p.id === player.id);
+          const isTeam2 = game.team2.players.some((p: any) => p.id === player.id);
           if (!isTeam1 && !isTeam2) return;
 
           const playerTeam = isTeam1 ? game.team1 : game.team2;
@@ -86,7 +87,7 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
                      (isTeam2 && game.team2.score > game.team1.score);
 
           // Update head-to-head stats
-          opponentTeam.players.forEach(opponent => {
+          opponentTeam.players.forEach((opponent: any) => {
             if (!newStats.headToHead[opponent.id]) {
               newStats.headToHead[opponent.id] = { wins: 0, losses: 0, games: 0 };
             }
@@ -96,7 +97,7 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
           });
 
           // Update partner stats
-          playerTeam.players.forEach(partner => {
+          playerTeam.players.forEach((partner: any) => {
             if (partner.id === player.id) return;
             if (!newStats.partners[partner.id]) {
               newStats.partners[partner.id] = { wins: 0, losses: 0, games: 0 };
@@ -108,6 +109,28 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
         });
 
         setStats(newStats);
+
+        // --- HOT STREAK LOGIC ---
+        // Sort games oldest to newest
+        const gamesChrono = [...gamesData].sort((a, b) => new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime());
+        let currentStreak = 0;
+        let maxStreak = 0;
+        for (const game of gamesChrono) {
+          const isTeam1 = game.team1.players.some((p: any) => p.id === player.id);
+          const isTeam2 = game.team2.players.some((p: any) => p.id === player.id);
+          if (!isTeam1 && !isTeam2) continue;
+          const won = (isTeam1 && game.team1.score > game.team2.score) || 
+                     (isTeam2 && game.team2.score > game.team1.score);
+          if (won) {
+            currentStreak++;
+            if (currentStreak > maxStreak) maxStreak = currentStreak;
+          } else {
+            currentStreak = 0;
+          }
+        }
+        setHotStreaks({ max: maxStreak, current: currentStreak });
+        // --- END HOT STREAK LOGIC ---
+
       } catch (error) {
         console.error('Error fetching games or users:', error);
       } finally {
@@ -163,6 +186,16 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
         <div className="flex justify-between items-start mb-4">
           <div>
             <h2 className="text-2xl font-bold">{player.displayName}</h2>
+            <div className="flex items-center gap-4 mt-1 mb-2">
+              <div className="flex flex-col">
+                {hotStreaks.max >= 3 && (
+                  <span className="text-orange-400 text-xs font-semibold flex items-center">🔥 Longest Streak: {hotStreaks.max}</span>
+                )}
+                {hotStreaks.current >= 3 && (
+                  <span className="text-orange-400 text-xs font-semibold flex items-center mt-1">🔥 Current Streak: {hotStreaks.current}</span>
+                )}
+              </div>
+            </div>
             <div className="text-sm text-gray-400 dark:text-gray-400 font-semibold mt-1 mb-2 tracking-wide uppercase">Season Stats</div>
             <div className="flex items-center gap-3 mb-2">
               <span className="text-xs bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded font-semibold">Win Rate: {winRatePercent}%</span>
