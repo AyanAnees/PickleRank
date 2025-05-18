@@ -46,7 +46,7 @@ async function recalculateSeason(seasonId) {
   // 4. Track stats if you want (wins, losses, etc.)
   const playerStats = {};
   playerIds.forEach(id => {
-    playerStats[id] = { wins: 0, losses: 0, gamesPlayed: 0, highestElo: BASE_ELO, lowestElo: BASE_ELO };
+    playerStats[id] = { wins: 0, losses: 0, gamesPlayed: 0, highestElo: BASE_ELO, lowestElo: BASE_ELO, currentStreak: 0 };
   });
 
   // 5. Replay all games
@@ -59,10 +59,23 @@ async function recalculateSeason(seasonId) {
     const team1Won = data.team1.score > data.team2.score;
     const scoreDiff = Math.abs(data.team1.score - data.team2.score);
     const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won, scoreDiff));
+    // Streak bonuses
+    const team1StreakBonuses = {};
+    const team2StreakBonuses = {};
 
     // Update team1
     for (const id of team1) {
-      playerElo[id] = Math.max(0, playerElo[id] + (team1Won ? eloChange : -eloChange));
+      let streakBonus = 0;
+      if (team1Won) {
+        playerStats[id].currentStreak = (playerStats[id].currentStreak || 0) + 1;
+        if (playerStats[id].currentStreak >= 3) {
+          streakBonus = (playerStats[id].currentStreak - 2) * 2;
+        }
+        team1StreakBonuses[id] = streakBonus;
+      } else {
+        playerStats[id].currentStreak = 0;
+      }
+      playerElo[id] = Math.max(0, playerElo[id] + (team1Won ? eloChange + streakBonus : -eloChange));
       playerStats[id].gamesPlayed += 1;
       if (team1Won) playerStats[id].wins += 1;
       else playerStats[id].losses += 1;
@@ -71,7 +84,17 @@ async function recalculateSeason(seasonId) {
     }
     // Update team2
     for (const id of team2) {
-      playerElo[id] = Math.max(0, playerElo[id] + (team1Won ? -eloChange : eloChange));
+      let streakBonus = 0;
+      if (!team1Won) {
+        playerStats[id].currentStreak = (playerStats[id].currentStreak || 0) + 1;
+        if (playerStats[id].currentStreak >= 3) {
+          streakBonus = (playerStats[id].currentStreak - 2) * 2;
+        }
+        team2StreakBonuses[id] = streakBonus;
+      } else {
+        playerStats[id].currentStreak = 0;
+      }
+      playerElo[id] = Math.max(0, playerElo[id] + (team1Won ? -eloChange : eloChange + streakBonus));
       playerStats[id].gamesPlayed += 1;
       if (!team1Won) playerStats[id].wins += 1;
       else playerStats[id].losses += 1;
@@ -79,9 +102,13 @@ async function recalculateSeason(seasonId) {
       playerStats[id].lowestElo = Math.min(playerStats[id].lowestElo, playerElo[id]);
     }
 
-    // Update the game's eloChange field in Firestore
-    await db.collection('games').doc(doc.id).update({ eloChange });
-    console.log(`Updated game ${doc.id} eloChange to ${eloChange}`);
+    // Update the game's eloChange and streakBonuses field in Firestore
+    await db.collection('games').doc(doc.id).update({
+      eloChange,
+      'team1.streakBonuses': team1StreakBonuses,
+      'team2.streakBonuses': team2StreakBonuses,
+    });
+    console.log(`Updated game ${doc.id} eloChange to ${eloChange}, streakBonuses:`, { team1StreakBonuses, team2StreakBonuses });
   }
 
   // 6. Update rankings in Firestore

@@ -21,6 +21,11 @@ function isAdmin() {
   return false;
 }
 
+type GameWithStreakBonuses = Omit<Game, 'team1' | 'team2'> & {
+  team1: Game['team1'] & { streakBonuses?: Record<string, number> };
+  team2: Game['team2'] & { streakBonuses?: Record<string, number> };
+};
+
 export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) {
   const [games, setGames] = useState<Game[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -29,6 +34,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
   const [refresh, setRefresh] = useState(0);
   const [showCount, setShowCount] = useState(3);
   const [selectedPlayer, setSelectedPlayer] = useState<User | null>(null);
+  const [tooltipPlayer, setTooltipPlayer] = useState<{gameId: string, playerId: string} | null>(null);
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -168,7 +174,8 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
     <div className="card space-y-4 dark:bg-gray-800">
       <h3 className="text-xl font-semibold">Game History</h3>
       <div className="space-y-4">
-        {games.slice(0, showCount).map((game) => {
+        {games.slice(0, showCount).map((gameOrig) => {
+          const game = gameOrig as GameWithStreakBonuses;
           const gameTime = formatGameTime(game.gameTime);
           const team1Won = game.team1.score > game.team2.score;
           const team2Won = game.team2.score > game.team1.score;
@@ -180,12 +187,19 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
           const loserScore = team1Won ? game.team2.score : game.team1.score;
           const winnerTrophy = team1Won ? team1Won : team2Won;
 
-          // Helper to render player name as clickable, stacked first/last name, with hot streak below
-          const renderPlayerName = (p: User | string) => {
+          // Helper to render player name as clickable, stacked first/last name, with hot streak below and streak bonus tooltip
+          const renderPlayerName = (p: User | string, gameId: string) => {
             const id = typeof p === 'string' ? p : p.id;
             const userObj = users.find(u => u.id === id);
             const displayName = typeof p === 'string' ? getUserName(p) : p.displayName;
-            const streak = streaksByGame[game.id]?.[id];
+            const streak = streaksByGame[gameId]?.[id];
+            // Check for streak bonus
+            let streakBonus = 0;
+            if (game.team1?.streakBonuses && game.team1.streakBonuses[id] && game.team1.streakBonuses[id] > 0) {
+              streakBonus = game.team1.streakBonuses[id] || 0;
+            } else if (game.team2?.streakBonuses && game.team2.streakBonuses[id] && game.team2.streakBonuses[id] > 0) {
+              streakBonus = game.team2.streakBonuses[id] || 0;
+            }
             // Split name into first and last (handles middle names)
             const [firstName, ...rest] = displayName.split(' ');
             const lastName = rest.join(' ');
@@ -199,18 +213,32 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                 <span>{firstName}</span>
                 <span>{lastName}</span>
                 {streak && (
-                  <span className="mt-0.5 text-orange-500 flex items-center text-xs font-bold align-middle">🔥<span className="ml-0.5">{streak}</span></span>
+                  <span
+                    className="mt-0.5 text-orange-500 flex items-center text-xs font-bold align-middle relative cursor-pointer"
+                    onMouseEnter={() => setTooltipPlayer({gameId, playerId: id})}
+                    onMouseLeave={() => setTooltipPlayer(null)}
+                    onFocus={() => setTooltipPlayer({gameId, playerId: id})}
+                    onBlur={() => setTooltipPlayer(null)}
+                    tabIndex={0}
+                  >
+                    🔥<span className="ml-0.5">{streak}</span>
+                    {streakBonus > 0 && tooltipPlayer && tooltipPlayer.gameId === gameId && tooltipPlayer.playerId === id && (
+                      <span className="absolute left-1/2 -translate-x-1/2 mt-6 px-2 py-1 bg-gray-800 text-white text-xs rounded shadow z-50 whitespace-nowrap">
+                        +{streakBonus} streak bonus ELO
+                      </span>
+                    )}
+                  </span>
                 )}
               </button>
             );
           };
 
           // Helper to render a team as a flex row with & centered
-          const renderTeam = (players: (User | string)[]) => (
+          const renderTeam = (players: (User | string)[], gameId: string) => (
             <div className="flex flex-row items-center gap-2">
               {players.map((p, i) => (
                 <React.Fragment key={typeof p === 'string' ? p : p.id}>
-                  {renderPlayerName(p)}
+                  {renderPlayerName(p, gameId)}
                   {i < players.length - 1 && <span className="mx-1 font-bold text-lg">&</span>}
                 </React.Fragment>
               ))}
@@ -225,7 +253,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                   <div className="flex flex-col items-center">
                     <div className={'font-bold text-green-700 flex items-center mb-1'}>
                       <span className="mr-1">🏆</span>
-                      {renderTeam(winner.players)}
+                      {renderTeam(winner.players, game.id)}
                     </div>
                     <div className="my-1 text-xs text-gray-500 dark:text-gray-300 flex items-center">
                       <span className="mx-2">Score: {winnerScore} - {loserScore}</span>
@@ -233,7 +261,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                       <span className="mx-2 text-gray-400 dark:text-gray-400">±{game.eloChange} ELO</span>
                     </div>
                     <div className={'font-medium mt-1'}>
-                      {renderTeam(loser.players)}
+                      {renderTeam(loser.players, game.id)}
                     </div>
                   </div>
                   {game.recordedBy?.name && (

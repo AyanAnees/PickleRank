@@ -192,6 +192,9 @@ export async function POST(request: Request) {
       const team1Won = team1.score > team2.score;
       const scoreDiff = Math.abs(team1.score - team2.score);
       const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won, scoreDiff));
+      // Calculate streak bonuses for each player
+      const team1StreakBonuses: Record<string, number> = {};
+      const team2StreakBonuses: Record<string, number> = {};
       // Get user data to include who recorded the game (fetch directly, not from players)
       const recorderDoc = await db.collection('users').doc(userId).get();
       const userData = recorderDoc.data();
@@ -203,11 +206,13 @@ export async function POST(request: Request) {
           players: team1.players,
           score: team1.score,
           elo: team1Elo,
+          streakBonuses: team1StreakBonuses,
         },
         team2: {
           players: team2.players,
           score: team2.score,
           elo: team2Elo,
+          streakBonuses: team2StreakBonuses,
         },
         eloChange,
         createdAt: Timestamp.now(),
@@ -238,8 +243,13 @@ export async function POST(request: Request) {
           winStreak: 0,
           currentStreak: 0,
         };
-        const newElo = Math.max(0, rankingData.currentElo + (team1Won ? eloChange : -eloChange));
+        let streakBonus = 0;
         const won = team1Won;
+        if (won && seasonStats.currentStreak >= 3) {
+          streakBonus = (seasonStats.currentStreak - 2) * 2;
+        }
+        if (won) team1StreakBonuses[playerId] = streakBonus;
+        const newElo = Math.max(0, rankingData.currentElo + (team1Won ? eloChange + streakBonus : -eloChange));
         transaction.update(rankingRef, {
           currentElo: newElo,
           wins: (rankingData.wins || 0) + (won ? 1 : 0),
@@ -278,8 +288,13 @@ export async function POST(request: Request) {
           winStreak: 0,
           currentStreak: 0,
         };
-        const newElo = Math.max(0, rankingData.currentElo + (team1Won ? -eloChange : eloChange));
+        let streakBonus = 0;
         const won = !team1Won;
+        if (won && seasonStats.currentStreak >= 3) {
+          streakBonus = (seasonStats.currentStreak - 2) * 2;
+        }
+        if (won) team2StreakBonuses[playerId] = streakBonus;
+        const newElo = Math.max(0, rankingData.currentElo + (team1Won ? -eloChange : eloChange + streakBonus));
         transaction.update(rankingRef, {
           currentElo: newElo,
           wins: (rankingData.wins || 0) + (won ? 1 : 0),
