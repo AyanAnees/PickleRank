@@ -35,6 +35,21 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
   const [showCount, setShowCount] = useState(3);
   const [selectedPlayer, setSelectedPlayer] = useState<User | null>(null);
   const [tooltipPlayer, setTooltipPlayer] = useState<{gameId: string, playerId: string} | null>(null);
+  const [infoGameId, setInfoGameId] = useState<string | null>(null);
+
+  // Close info popup on outside click
+  React.useEffect(() => {
+    if (!infoGameId) return;
+    function handleClick(e: MouseEvent) {
+      // Only close if click is outside any .game-info-popup or .game-info-btn
+      const target = e.target as HTMLElement;
+      if (!target.closest('.game-info-popup') && !target.closest('.game-info-btn')) {
+        setInfoGameId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [infoGameId]);
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -187,6 +202,20 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
           const loserScore = team1Won ? game.team2.score : game.team1.score;
           const winnerTrophy = team1Won ? team1Won : team2Won;
 
+          // Collect all streak bonuses for this game
+          const allBonuses: { playerId: string, bonus: number }[] = [];
+          if (game.team1?.streakBonuses) {
+            Object.entries(game.team1.streakBonuses).forEach(([pid, bonus]) => {
+              if (bonus > 0) allBonuses.push({ playerId: pid, bonus });
+            });
+          }
+          if (game.team2?.streakBonuses) {
+            Object.entries(game.team2.streakBonuses).forEach(([pid, bonus]) => {
+              if (bonus > 0) allBonuses.push({ playerId: pid, bonus });
+            });
+          }
+          const showInfo = allBonuses.length > 0;
+
           // Helper to render player name as clickable, stacked first/last name, with hot streak below and streak bonus tooltip
           const renderPlayerName = (p: User | string, gameId: string) => {
             const id = typeof p === 'string' ? p : p.id;
@@ -281,6 +310,35 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
                 <div className="absolute bottom-2 left-4 text-[10px] text-gray-400 dark:text-gray-500 text-left">
                   {gameTime.full}
                   <span className="ml-1">({gameTime.relative})</span>
+                </div>
+              )}
+              {/* Info icon for streak bonus */}
+              {showInfo && (
+                <div className="absolute top-2 right-2 z-10">
+                  <button
+                    className="w-4 h-4 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 bg-white/80 dark:bg-gray-900/60 text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-indigo-400 game-info-btn"
+                    style={{ lineHeight: '1', padding: 0 }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setInfoGameId(infoGameId === game.id ? null : game.id);
+                    }}
+                    aria-label="Show streak bonus info"
+                  >
+                    <span style={{fontWeight: 700, fontFamily: 'inherit'}}>i</span>
+                  </button>
+                  {infoGameId === game.id && (
+                    <div className="absolute right-0 mt-2 w-max min-w-[180px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded shadow-lg p-3 text-xs z-50 game-info-popup">
+                      <div className="font-semibold mb-1 text-gray-700 dark:text-gray-200">Streak Bonus ELO</div>
+                      {allBonuses.map(({ playerId, bonus }) => {
+                        const user = users.find(u => u.id === playerId);
+                        return (
+                          <div key={playerId} className="mb-1 last:mb-0 text-gray-800 dark:text-gray-100">
+                            {user ? user.displayName : playerId}: <span className="text-green-600 font-bold">+{bonus}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
