@@ -188,12 +188,12 @@ export default function PlayerProfile({ player, seasonId, onClose }: PlayerProfi
             <h2 className="text-2xl font-bold">{player.displayName}</h2>
             <div className="flex items-center gap-4 mt-1 mb-2">
               <div className="flex flex-col">
-                {hotStreaks.max >= 3 && (
-                  <span className="text-orange-400 text-xs font-semibold flex items-center">🔥 Longest Streak: {hotStreaks.max}</span>
-                )}
                 {hotStreaks.current >= 3 && (
-                  <span className="text-orange-400 text-xs font-semibold flex items-center mt-1">🔥 Current Streak: {hotStreaks.current}</span>
+                  <span className="text-orange-500 text-xs font-semibold flex items-center mb-1">🔥 Currently on a win streak: {hotStreaks.current} games</span>
                 )}
+                <span className="text-orange-400 text-xs font-semibold flex items-center">
+                  Longest win streak: {hotStreaks.max} games
+                </span>
               </div>
             </div>
             <div className="text-sm text-gray-400 dark:text-gray-400 font-semibold mt-1 mb-2 tracking-wide uppercase">Season Stats</div>
