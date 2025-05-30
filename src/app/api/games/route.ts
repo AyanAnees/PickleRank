@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 import { NextResponse } from 'next/server';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, db } from '@/lib/firebase-admin';
-import { calculateEloChange } from '@/lib/elo';
+import { calculateEloChange, getStreakBonus } from '@/lib/elo';
 
 interface Team {
   players: string[];
@@ -246,7 +246,7 @@ export async function POST(request: Request) {
         let streakBonus = 0;
         const won = team1Won;
         if (won && seasonStats.currentStreak >= 3) {
-          streakBonus = (seasonStats.currentStreak - 2) * 2;
+          streakBonus = getStreakBonus(seasonStats.currentStreak);
         }
         if (won) team1StreakBonuses[playerId] = streakBonus;
         const newElo = Math.max(0, rankingData.currentElo + (team1Won ? eloChange + streakBonus : -eloChange));
@@ -291,7 +291,7 @@ export async function POST(request: Request) {
         let streakBonus = 0;
         const won = !team1Won;
         if (won && seasonStats.currentStreak >= 3) {
-          streakBonus = (seasonStats.currentStreak - 2) * 2;
+          streakBonus = getStreakBonus(seasonStats.currentStreak);
         }
         if (won) team2StreakBonuses[playerId] = streakBonus;
         const newElo = Math.max(0, rankingData.currentElo + (team1Won ? -eloChange : eloChange + streakBonus));

@@ -30,4 +30,8 @@ export function calculateEloChange(
   // Margin multiplier: 1x for a 2-point win, up to 1.5x for a 7+ point win
   const marginMultiplier = 1 + Math.min((scoreDiff - 2) / 10, 0.5);
   return Math.round(K_FACTOR * (actualScore - expectedScore) * marginMultiplier);
+}
+
+export function getStreakBonus(currentStreak: number): number {
+  return Math.max(0, Math.min(currentStreak - 2, 5));
 } 

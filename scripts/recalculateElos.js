@@ -17,6 +17,10 @@ function calculateEloChange(playerElo, opponentElo, didWin, scoreDiff) {
   return Math.round(K * ((didWin ? 1 : 0) - expected) * marginMultiplier);
 }
 
+function getStreakBonus(currentStreak) {
+  return Math.max(0, Math.min(currentStreak - 2, 5));
+}
+
 async function recalculateSeason(seasonId) {
   // 1. Get all games for the season, sorted by gameTime
   const gamesSnap = await db.collection('games')
@@ -68,9 +72,7 @@ async function recalculateSeason(seasonId) {
       let streakBonus = 0;
       if (team1Won) {
         playerStats[id].currentStreak = (playerStats[id].currentStreak || 0) + 1;
-        if (playerStats[id].currentStreak >= 3) {
-          streakBonus = (playerStats[id].currentStreak - 2) * 2;
-        }
+        streakBonus = getStreakBonus(playerStats[id].currentStreak);
         team1StreakBonuses[id] = streakBonus;
       } else {
         playerStats[id].currentStreak = 0;
@@ -87,9 +89,7 @@ async function recalculateSeason(seasonId) {
       let streakBonus = 0;
       if (!team1Won) {
         playerStats[id].currentStreak = (playerStats[id].currentStreak || 0) + 1;
-        if (playerStats[id].currentStreak >= 3) {
-          streakBonus = (playerStats[id].currentStreak - 2) * 2;
-        }
+        streakBonus = getStreakBonus(playerStats[id].currentStreak);
         team2StreakBonuses[id] = streakBonus;
       } else {
         playerStats[id].currentStreak = 0;

@@ -28,6 +28,7 @@ export default function RankingsExplained() {
           <li>The margin of victory (score difference) &mdash; bigger wins mean bigger ELO swings</li>
           <li>If you win against a higher-rated team, you gain more points</li>
           <li>If you lose to a lower-rated team, you lose more points</li>
+          <li><strong>Streak bonus:</strong> If you win 3 games in a row, you get +1 bonus ELO, 4 in a row is +2, 5 is +3, up to a maximum of +5 per game.</li>
         </ul>
 
         <h2 className="text-xl font-semibold mt-8 mb-4">Example Scenarios</h2>

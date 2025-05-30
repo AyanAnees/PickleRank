@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
-import { calculateEloChange } from '@/lib/elo';
+import { calculateEloChange, getStreakBonus } from '@/lib/elo';
 
 const ADMIN_PHONE = '+15856831831';
 const ADMIN_PHONES = ['+15856831831', '+15856831234'];
@@ -182,9 +182,7 @@ async function recalculateSeasonElo(seasonId: string) {
       let streakBonus = 0;
       if (team1Won) {
         playerStats[id].currentStreak = (playerStats[id].currentStreak || 0) + 1;
-        if (playerStats[id].currentStreak >= 3) {
-          streakBonus = (playerStats[id].currentStreak - 2) * 2;
-        }
+        streakBonus = getStreakBonus(playerStats[id].currentStreak);
       } else {
         playerStats[id].currentStreak = 0;
       }
@@ -196,9 +194,7 @@ async function recalculateSeasonElo(seasonId: string) {
       let streakBonus = 0;
       if (!team1Won) {
         playerStats[id].currentStreak = (playerStats[id].currentStreak || 0) + 1;
-        if (playerStats[id].currentStreak >= 3) {
-          streakBonus = (playerStats[id].currentStreak - 2) * 2;
-        }
+        streakBonus = getStreakBonus(playerStats[id].currentStreak);
       } else {
         playerStats[id].currentStreak = 0;
       }
