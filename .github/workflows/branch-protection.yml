@@ -1,0 +1,36 @@
+name: Branch Protection
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Check target branch
+        run: |
+          if [[ "${{ github.base_ref }}" == "main" ]]; then
+            echo "Target branch is main. Checking for admin approval and status checks..."
+            # Check if the PR is approved by the admin (awaisahmed12)
+            if [[ "${{ github.event.pull_request.review_state }}" != "approved" ]] || [[ "${{ github.event.pull_request.reviewers.*.login }}" != *"awaisahmed12"* ]]; then
+              echo "PR is not approved by the admin (awaisahmed12). Failing."
+              exit 1
+            fi
+            # Check if status checks are passing
+            if [[ "${{ github.event.pull_request.mergeable_state }}" != "clean" ]]; then
+              echo "Status checks are not passing. Failing."
+              exit 1
+            fi
+          elif [[ "${{ github.base_ref }}" == "qa" ]]; then
+            echo "Target branch is qa. Checking for status checks..."
+            if [[ "${{ github.event.pull_request.mergeable_state }}" != "clean" ]]; then
+              echo "Status checks are not passing. Failing."
+              exit 1
+            fi
+          else
+            echo "Target branch is neither main nor qa. Skipping checks."
+          fi 
