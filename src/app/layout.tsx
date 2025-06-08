@@ -10,12 +10,13 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'PickleRank - Go PICKLEHEADS',
   description: 'Do it to em Dib',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   icons: {
     icon: '/favicon.ico',
   },
   openGraph: {
-    title: 'SHAHEER COME HOME',
-    description: 'Shaheer is not here is he',
+    title: 'Bring back 24h Shami',
+    description: 'Whatever it takes',
     images: [
       {
         url: 'https://pickle-rank.vercel.app/yoyo.png',
