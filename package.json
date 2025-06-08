@@ -1,29 +1,48 @@
 {
-  "name": "pickleheads",
-  "version": "1.0.0",
-  "description": "Pickleheads rankings",
-  "main": "index.js",
+  "name": "picklerank",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "format": "prettier --write ."
+    "lint": "next lint",
+    "init-db": "node src/scripts/init.js"
   },
   "dependencies": {
-    "next": "^12.0.0",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2"
+    "@heroicons/react": "^2.1.1",
+    "@types/node": "^20.11.17",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@types/react-google-recaptcha": "^2.1.9",
+    "autoprefixer": "^10.4.17",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.5",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.1.0",
+    "firebase": "10.7.1",
+    "firebase-admin": "^12.7.0",
+    "next": "14.1.0",
+    "postcss": "^8.4.35",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-google-recaptcha": "^3.1.0",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3"
   },
   "devDependencies": {
-    "eslint": "^8.0.0",
-    "eslint-config-next": "^12.0.0",
-    "prettier": "^2.5.0",
-    "husky": "^7.0.0"
+    "@babel/core": "^7.27.1",
+    "@babel/plugin-proposal-class-properties": "^7.18.6",
+    "@babel/plugin-proposal-private-methods": "^7.18.6",
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@babel/plugin-transform-class-properties": "^7.27.1",
+    "@babel/plugin-transform-private-methods": "^7.27.1",
+    "@babel/plugin-transform-private-property-in-object": "^7.27.1",
+    "@babel/preset-env": "^7.27.1",
+    "babel-loader": "^10.0.0",
+    "ts-node": "^10.9.2"
   },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm run lint && npm run format"
-    }
+  "resolutions": {
+    "undici": "5.28.4"
   }
 }
