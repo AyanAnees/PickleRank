@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16'
+          node-version: '18'
 
       - name: Install dependencies
         run: npm ci
@@ -31,14 +31,18 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           echo "Deploying to production..."
-          npx vercel --prod --env-file .env.production
+          npx vercel --prod --confirm
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy to QA
         if: github.ref == 'refs/heads/qa'
         run: |
           echo "Deploying to QA environment..."
-          npx vercel --env-file .env.qa
+          npx vercel --confirm
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }} 
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }} 
