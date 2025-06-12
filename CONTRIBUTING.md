@@ -80,4 +80,4 @@
 
 ## Need Help?
 
-- Open an issue or contact Awais. 
+- Contact Awais. 
