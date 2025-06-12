@@ -13,7 +13,13 @@ jobs:
     steps:
       - name: Check if direct push
         run: |
+          # Allow merges from feature branches
           if [[ "${{ github.event_name }}" == "push" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            # Check if this is a merge commit
+            if [[ "${{ github.event.head_commit.message }}" == *"Merge pull request"* ]]; then
+              echo "Merge detected, allowing push"
+              exit 0
+            fi
             echo "Direct push detected to ${{ github.ref }}"
             echo "Please use pull requests instead of direct pushes"
             exit 1
