@@ -43,6 +43,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const isQA = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID === 'pickleheads-qa';
+
   return (
     <html lang="en" className={inter.variable}>
       <head>
@@ -55,6 +57,11 @@ export default function RootLayout({
       <body className={`${inter.className} bg-background dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100`}>
         <AuthProvider>
           <ThemeSync />
+          {isQA && (
+            <div className="bg-yellow-500 text-black text-center py-2 font-bold">
+              🚧 QA ENVIRONMENT - TESTING ONLY 🚧
+            </div>
+          )}
           <main className="max-w-md mx-auto px-4 py-8">
             {children}
           </main>
