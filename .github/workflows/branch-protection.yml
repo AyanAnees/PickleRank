@@ -1,0 +1,20 @@
+name: Branch Protection
+
+on:
+  push:
+    branches:
+      - qa
+      - main
+      - master
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if direct push
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            echo "Direct push detected to ${{ github.ref }}"
+            echo "Please use pull requests instead of direct pushes"
+            exit 1
+          fi 
