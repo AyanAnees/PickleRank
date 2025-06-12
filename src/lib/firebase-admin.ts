@@ -12,6 +12,8 @@ if (!getApps().length) {
     throw new Error('Missing Firebase Admin credentials');
   }
 
+  console.log('FIREBASE_PROJECT_ID:', projectId);
+
   try {
     initializeApp({
       credential: cert({

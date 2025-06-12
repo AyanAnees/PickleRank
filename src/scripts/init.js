@@ -1,15 +1,15 @@
-require('dotenv').config({ path: '.env.local' });
+require('dotenv').config();
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection, addDoc, Timestamp } = require('firebase/firestore');
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCcsEY9DUd8eM3LNm5AIji0QRP0XUM8IL4",
-  authDomain: "picklerank-6c246.firebaseapp.com",
-  projectId: "picklerank-6c246",
-  storageBucket: "picklerank-6c246.firebasestorage.app",
-  messagingSenderId: "53751825189",
-  appId: "1:53751825189:web:4ac67bd9ea905ce8ea10cc",
-  measurementId: "G-DZBYVGCC5F"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
