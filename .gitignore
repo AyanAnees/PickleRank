@@ -1,3 +1,5 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
 # dependencies
 /node_modules
 /.pnp
@@ -33,17 +35,21 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Firebase
+serviceAccountKey*.json
+firebase-debug.log
+firebase-debug.*.log
+
 # IDE
 .idea/
 .vscode/
+*.swp
+*.swo
 
-# Firebase
-*-firebase-adminsdk-*.json
-firebase-debug.log
-firebase-debug.*.log
+# OS
+Thumbs.db
 
 # Logs
 logs
 *.log 
-serviceAccountKey.json
 .env.production
