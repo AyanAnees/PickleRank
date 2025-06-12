@@ -1,3 +1,48 @@
+# Pickleheads
+
+Pickleheads is a structured, real-world dev environment for beginner CS students. It provides a professional setup for onboarding, testing, deployment, and contribution while remaining cost-free.
+
+## Quickstart
+
+1. **Clone the repository**
+   Open your terminal and run:
+   ```
+   git clone https://github.com/yourusername/Pickleheads.git
+   cd Pickleheads
+   ```
+
+2. **Install dependencies**
+   Run:
+   ```
+   npm install
+   ```
+
+3. **Set up environment variables**
+   - Copy `.env.example` to `.env.local` for local development.
+   - Fill in your Firebase credentials and other required variables.
+   - Never commit real secrets or credentials.
+
+4. **Run the development server**
+   Run:
+   ```
+   npm run dev
+   ```
+   The app will be available at [http://localhost:3000](http://localhost:3000).
+
+## Detailed Instructions
+
+For detailed instructions on contributing, testing, and deployment, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Firebase Setup
+
+- Obtain your Firebase credentials from the Firebase Console.
+- Never commit real credentials or service account keys.
+- For local development, use Firebase Emulator Suite.
+
+## License
+
+This project is licensed under the MIT License.
+
 # PickleRank 🏓
 
 A modern, mobile-first application for tracking and ranking pickleball players using an ELO rating system.

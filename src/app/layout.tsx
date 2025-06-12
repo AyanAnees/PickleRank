@@ -5,7 +5,11 @@ import Footer from './Footer';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ThemeSync from '@/components/ThemeToggle';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
   title: 'PickleRank - Go PICKLEHEADS',
@@ -40,7 +44,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <head>
         <meta property="og:image" content="https://pickle-rank.vercel.app/og-image.png" />
         <meta property="og:image:width" content="1200" />

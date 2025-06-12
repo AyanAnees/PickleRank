@@ -139,8 +139,10 @@ export default function SignIn() {
     try {
       if (!recaptchaVerifierRef.current) throw new Error('reCAPTCHA not initialized');
       const formattedPhone = formatPhoneNumber(phoneNumber);
-      if (!validatePhoneNumber(formattedPhone)) throw new Error('Please enter a valid phone number');
       const e164Phone = `+1${formattedPhone.replace(/\D/g, '')}`;
+      
+      if (!validatePhoneNumber(formattedPhone)) throw new Error('Please enter a valid phone number');
+      
       const confirmationResult = await signInWithPhoneNumber(auth, e164Phone, recaptchaVerifierRef.current);
       setVerificationId(confirmationResult.verificationId);
       setVerificationSent(true);
@@ -153,7 +155,7 @@ export default function SignIn() {
       } else if (err.code === 'auth/too-many-requests') {
         setError('Too many attempts. Please try again later.');
       } else {
-        setError(err.message || 'Failed to send verification code. Please try again.');
+        setError('Failed to send verification code. Please try again.');
       }
     } finally {
       setLoading(false);
