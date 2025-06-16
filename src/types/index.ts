@@ -18,6 +18,11 @@ export interface User {
   email: string;
 }
 
+export interface Team {
+  players: string[];
+  score: number;
+}
+
 export interface SeasonStats {
   eloRating: number;
   gamesPlayed: number;
