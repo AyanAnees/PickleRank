@@ -1,6 +1,6 @@
 # Pickleheads
 
-Pickleheads is a structured, real-world dev environment. It provides a professional setup for onboarding, testing, deployment, and contribution while remaining cost-free.
+Pickleheads is a pickleball web app used to rank players based on their game scores, opponents' ratings, and teammates' ratings.
 
 ## Quickstart
 
