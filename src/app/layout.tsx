@@ -59,7 +59,7 @@ export default function RootLayout({
           <ThemeSync />
           {isQA && (
             <div className="bg-yellow-500 text-black text-center py-2 font-bold">
-              🚧 QA ENVIRONMENT - TESTING ONLY 🚧
+              🚧 QA ENVIRONMENT 🚧
             </div>
           )}
           <main className="max-w-md mx-auto px-4 py-8">
