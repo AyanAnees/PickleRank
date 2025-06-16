@@ -1,6 +1,6 @@
 # Pickleheads
 
-Pickleheads is a structured, real-world dev environment for beginner CS students. It provides a professional setup for onboarding, testing, deployment, and contribution while remaining cost-free.
+Pickleheads is a structured, real-world dev environment. It provides a professional setup for onboarding, testing, deployment, and contribution while remaining cost-free.
 
 ## Quickstart
 
