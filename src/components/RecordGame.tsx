@@ -103,19 +103,28 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
       if (!user) throw new Error('No authenticated user found');
       const idToken = await user.getIdToken(true);
 
-      const payload = {
-        team1,
-        team2,
-        gameTime: gameTime.toISOString(),
-        seasonId: selectedSeasonId,
-        recordedBy: user.uid
+      // Build teams from form state
+      const team1Obj = {
+        players: [team1Player1, team1Player2],
+        score: parseInt(team1Score, 10)
+      };
+      const team2Obj = {
+        players: [team2Player1, team2Player2],
+        score: parseInt(team2Score, 10)
       };
 
-      const response = await fetch('/api/seasons/' + selectedSeasonId + '/games', {
+      const payload = {
+        team1: team1Obj,
+        team2: team2Obj,
+        seasonId: seasonId,
+        userId: user.uid
+      };
+
+      const response = await fetch('/api/games', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Cookie': `auth-token=${idToken}`
+          'Authorization': `Bearer ${idToken}`
         },
         body: JSON.stringify(payload),
       });
@@ -128,6 +137,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
       setSuccess(true);
       setShowModal(false);
       onGameRecorded();
+      resetForm(); // Optionally reset the form
     } catch (err: any) {
       setError(err.message || 'Failed to record game');
     } finally {
