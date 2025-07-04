@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import type { Team, Season } from '@/types';
 
 interface RecordGameProps {
   seasonId: string;
@@ -11,12 +12,16 @@ interface RecordGameProps {
 
 export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps) {
   const { user } = useAuth();
-  console.log('RecordGame user:', user);
-  const [players, setPlayers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [team1, setTeam1] = useState<Team>({ players: [], score: 0 });
+  const [team2, setTeam2] = useState<Team>({ players: [], score: 0 });
+  const [gameTime, setGameTime] = useState<Date>(new Date());
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [availablePlayers, setAvailablePlayers] = useState<User[]>([]);
 
   // Form state
   const [team1Player1, setTeam1Player1] = useState('');
@@ -31,7 +36,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
       try {
         const response = await fetch('/api/users');
         const data = await response.json();
-        setPlayers(data);
+        setAvailablePlayers(data);
       } catch (error) {
         console.error('Error fetching players:', error);
         setError('Failed to load players');
@@ -91,58 +96,52 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setIsSubmitting(true);
-
-    if (!user?.uid) {
-      setError('You must be signed in to record a game.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!validateTeams()) {
-      setIsSubmitting(false);
-      return;
-    }
-
-    const payload = {
-      seasonId,
-      team1: {
-        players: [team1Player1, team1Player2],
-        score: parseInt(team1Score),
-      },
-      team2: {
-        players: [team2Player1, team2Player2],
-        score: parseInt(team2Score),
-      },
-      userId: user.uid,
-    };
-    console.log('Submitting game:', payload);
+    setSuccess(false);
+    setLoading(true);
 
     try {
+      if (!user) throw new Error('No authenticated user found');
+      const idToken = await user.getIdToken(true);
+
+      // Build teams from form state
+      const team1Obj = {
+        players: [team1Player1, team1Player2],
+        score: parseInt(team1Score, 10)
+      };
+      const team2Obj = {
+        players: [team2Player1, team2Player2],
+        score: parseInt(team2Score, 10)
+      };
+
+      const payload = {
+        team1: team1Obj,
+        team2: team2Obj,
+        seasonId: seasonId,
+        userId: user.uid
+      };
+
       const response = await fetch('/api/games', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
         },
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
+        const data = await response.json();
         throw new Error(data.error || 'Failed to record game');
       }
 
-      // Reset form and show success message
-      resetForm();
-      
-      // Notify parent component
+      setSuccess(true);
+      setShowModal(false);
       onGameRecorded();
-    } catch (error) {
-      console.error('Error recording game:', error);
-      setError(error instanceof Error ? error.message : 'Failed to record game. Please try again.');
+      resetForm(); // Optionally reset the form
+    } catch (err: any) {
+      setError(err.message || 'Failed to record game');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -151,7 +150,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
   }
 
   // Sort players alphabetically by first name (then last name)
-  const sortedPlayers = [...players].sort((a, b) => {
+  const sortedPlayers = [...availablePlayers].sort((a, b) => {
     if (a.firstName.toLowerCase() === b.firstName.toLowerCase()) {
       return a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase());
     }
@@ -184,7 +183,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 onChange={(e) => setTeam1Player1(e.target.value)}
                 className="input-field"
                 required
-                disabled={isSubmitting}
+                disabled={loading}
               >
                 <option value="">Select Player 1</option>
                 {sortedPlayers.map((player) => (
@@ -198,7 +197,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 onChange={(e) => setTeam1Player2(e.target.value)}
                 className="input-field"
                 required
-                disabled={isSubmitting}
+                disabled={loading}
               >
                 <option value="">Select Player 2</option>
                 {sortedPlayers.map((player) => (
@@ -215,7 +214,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 className="input-field"
                 min="0"
                 required
-                disabled={isSubmitting}
+                disabled={loading}
               />
             </div>
           </div>
@@ -228,7 +227,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 onChange={(e) => setTeam2Player1(e.target.value)}
                 className="input-field"
                 required
-                disabled={isSubmitting}
+                disabled={loading}
               >
                 <option value="">Select Player 1</option>
                 {sortedPlayers.map((player) => (
@@ -242,7 +241,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 onChange={(e) => setTeam2Player2(e.target.value)}
                 className="input-field"
                 required
-                disabled={isSubmitting}
+                disabled={loading}
               >
                 <option value="">Select Player 2</option>
                 {sortedPlayers.map((player) => (
@@ -259,7 +258,7 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
                 className="input-field"
                 min="0"
                 required
-                disabled={isSubmitting}
+                disabled={loading}
               />
             </div>
           </div>
@@ -268,9 +267,9 @@ export default function RecordGame({ seasonId, onGameRecorded }: RecordGameProps
         <button
           type="submit"
           className="btn-primary w-full"
-          disabled={isSubmitting || !user?.uid}
+          disabled={loading || !user?.uid}
         >
-          {isSubmitting ? 'Recording...' : 'Record Game'}
+          {loading ? 'Recording...' : 'Record Game'}
         </button>
       </form>
     </div>
