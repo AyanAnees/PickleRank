@@ -25,6 +25,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Special handling for user registration endpoint
+  if (pathname === '/api/users' && request.method === 'POST') {
+    // Allow authenticated users to register (they have token but no complete user record)
+    const authToken = request.cookies.get('auth-token')?.value;
+    if (authToken) {
+      try {
+        // Just verify the token is valid, don't check user completeness
+        const verifyResponse = await fetch(`${request.nextUrl.origin}/api/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken: authToken }),
+        });
+        
+        if (verifyResponse.ok) {
+          return NextResponse.next(); // Allow registration
+        }
+      } catch (error) {
+        // Fall through to normal auth flow
+      }
+    }
+  }
+
   const authToken = request.cookies.get('auth-token')?.value;
 
   // Redirect to sign in if no auth token
