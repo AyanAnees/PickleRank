@@ -1,22 +1,21 @@
 export const runtime = "nodejs";
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { db, adminAuth } from '@/lib/firebase-admin';
 import { calculateEloChange, getStreakBonus } from '@/lib/elo';
 
-const ADMIN_PHONE = '+15856831831';
-const ADMIN_PHONES = ['+15856831831', '+15856831234'];
-
-async function isAdmin(request: Request) {
-  // Get user from auth token (assume phoneNumber is available in user record)
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) return false;
-  const idToken = authHeader.replace('Bearer ', '');
+async function isAdmin(request: Request): Promise<boolean> {
   try {
-    const { getAuth } = await import('firebase-admin/auth');
-    const decoded = await getAuth().verifyIdToken(idToken);
-    const phone = decoded.phone_number;
-    return typeof phone === 'string' && ADMIN_PHONES.includes(phone);
-  } catch {
+    const authToken = request.headers.get('cookie')?.split('auth-token=')[1]?.split(';')[0];
+    if (!authToken) return false;
+    
+    const decodedToken = await adminAuth.verifyIdToken(authToken);
+    const userId = decodedToken.uid;
+    
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+    
+    return userData?.isAdmin === true;
+  } catch (error) {
     return false;
   }
 }
@@ -55,8 +54,35 @@ export async function PUT(request: Request, { params }: { params: { gameId: stri
   const { gameId } = params;
   try {
     const updateData = await request.json();
+    
+    // Validate the update data
+    if (updateData.team1?.score !== undefined && updateData.team2?.score !== undefined) {
+      const score1 = updateData.team1.score;
+      const score2 = updateData.team2.score;
+      
+      if (!Number.isInteger(score1) || !Number.isInteger(score2)) {
+        return NextResponse.json({ error: 'Scores must be integers' }, { status: 400 });
+      }
+      
+      if (score1 < 0 || score2 < 0) {
+        return NextResponse.json({ error: 'Scores must be non-negative' }, { status: 400 });
+      }
+      
+      if (score1 < 11 && score2 < 11) {
+        return NextResponse.json({ error: 'At least one team must score 11 points' }, { status: 400 });
+      }
+      
+      if (Math.abs(score1 - score2) < 2) {
+        return NextResponse.json({ error: 'Winner must win by at least 2 points' }, { status: 400 });
+      }
+    }
+    
     // Update the game
-    await db.collection('games').doc(gameId).update(updateData);
+    await db.collection('games').doc(gameId).update({
+      ...updateData,
+      updatedAt: new Date()
+    });
+    
     // Get the updated game to find seasonId
     const gameDoc = await db.collection('games').doc(gameId).get();
     const game = gameDoc.data();

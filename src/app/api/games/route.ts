@@ -9,18 +9,19 @@ interface Team {
   score: number;
 }
 
-const ADMIN_PHONE = '+15856831831';
-
-async function isAdmin(request: Request) {
-  // Get user from auth token (assume phoneNumber is available in user record)
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) return false;
-  const idToken = authHeader.replace('Bearer ', '');
+async function isAdmin(request: Request): Promise<boolean> {
   try {
-    const { getAuth } = await import('firebase-admin/auth');
-    const decoded = await getAuth().verifyIdToken(idToken);
-    return decoded.phone_number === ADMIN_PHONE;
-  } catch {
+    const authToken = request.headers.get('cookie')?.split('auth-token=')[1]?.split(';')[0];
+    if (!authToken) return false;
+    
+    const decodedToken = await adminAuth.verifyIdToken(authToken);
+    const userId = decodedToken.uid;
+    
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+    
+    return userData?.isAdmin === true;
+  } catch (error) {
     return false;
   }
 }

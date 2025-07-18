@@ -2,27 +2,50 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Season } from '@/types';
+import { Season, Game, User } from '@/types';
 
-interface User {
+interface AdminUser {
   isAdmin: boolean;
   firstName?: string;
   lastName?: string;
 }
 
+interface EditGameData {
+  id: string;
+  seasonId: string;
+  team1: {
+    players: string[];
+    score: number;
+  };
+  team2: {
+    players: string[];
+    score: number;
+  };
+  gameTime: string;
+}
+
 export default function AdminPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [seasonsLoading, setSeasonsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'seasons' | 'games'>('seasons');
   const [createFormData, setCreateFormData] = useState({
     name: '',
     startDate: '',
     endDate: '',
     deactivateOthers: true
   });
+  
+  // Game management state
+  const [games, setGames] = useState<Game[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [selectedSeason, setSelectedSeason] = useState<string>('');
+  const [editingGame, setEditingGame] = useState<EditGameData | null>(null);
+  const [gamesLoading, setGamesLoading] = useState(false);
+  
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
@@ -30,6 +53,7 @@ export default function AdminPage() {
   useEffect(() => {
     fetchUserData();
     fetchSeasons();
+    fetchAllUsers();
   }, []);
 
   const fetchUserData = async () => {
@@ -62,6 +86,12 @@ export default function AdminPage() {
       if (response.ok) {
         const seasonsData = await response.json();
         setSeasons(seasonsData);
+        
+        // Set default selected season to active season
+        const activeSeason = seasonsData.find((s: Season) => s.isActive);
+        if (activeSeason && !selectedSeason) {
+          setSelectedSeason(activeSeason.id);
+        }
       }
     } catch (error) {
       console.error('Error fetching seasons:', error);
@@ -70,6 +100,42 @@ export default function AdminPage() {
       setSeasonsLoading(false);
     }
   };
+
+  const fetchAllUsers = async () => {
+    try {
+      const response = await fetch('/api/users');
+      if (response.ok) {
+        const usersData = await response.json();
+        setAllUsers(usersData);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
+  const fetchGames = async (seasonId: string) => {
+    if (!seasonId) return;
+    
+    setGamesLoading(true);
+    try {
+      const response = await fetch(`/api/seasons/${seasonId}/games`);
+      if (response.ok) {
+        const gamesData = await response.json();
+        setGames(gamesData);
+      }
+    } catch (error) {
+      console.error('Error fetching games:', error);
+      setError('Failed to fetch games');
+    } finally {
+      setGamesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedSeason) {
+      fetchGames(selectedSeason);
+    }
+  }, [selectedSeason]);
 
   const handleCreateSeason = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,6 +209,98 @@ export default function AdminPage() {
     }
   };
 
+  const handleEditGame = (game: Game) => {
+    setEditingGame({
+      id: game.id,
+      seasonId: game.seasonId,
+      team1: {
+        players: game.team1.players.map(p => typeof p === 'string' ? p : p.id),
+        score: game.team1.score
+      },
+      team2: {
+        players: game.team2.players.map(p => typeof p === 'string' ? p : p.id),
+        score: game.team2.score
+      },
+      gameTime: new Date(game.gameTime).toISOString().slice(0, 16)
+    });
+  };
+
+  const handleSaveGameEdit = async () => {
+    if (!editingGame) return;
+
+    setActionLoading(`edit-${editingGame.id}`);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Validate scores
+      if (editingGame.team1.score < 0 || editingGame.team2.score < 0) {
+        throw new Error('Scores must be non-negative');
+      }
+
+      if (editingGame.team1.score < 11 && editingGame.team2.score < 11) {
+        throw new Error('At least one team must score 11 points');
+      }
+
+      if (Math.abs(editingGame.team1.score - editingGame.team2.score) < 2) {
+        throw new Error('Winner must win by at least 2 points');
+      }
+
+      const response = await fetch(`/api/games/${editingGame.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          team1: editingGame.team1,
+          team2: editingGame.team2,
+          gameTime: new Date(editingGame.gameTime).toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to update game');
+      }
+
+      setSuccess('Game updated successfully! ELO ratings have been recalculated for the entire season.');
+      setEditingGame(null);
+      await fetchGames(selectedSeason);
+    } catch (error: any) {
+      setError(error.message || 'Failed to update game');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteGame = async (gameId: string) => {
+    if (!window.confirm('Are you sure you want to delete this game? This will recalculate ELO ratings for the entire season.')) {
+      return;
+    }
+
+    setActionLoading(`delete-${gameId}`);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(`/api/games/${gameId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to delete game');
+      }
+
+      setSuccess('Game deleted successfully! ELO ratings have been recalculated for the entire season.');
+      await fetchGames(selectedSeason);
+    } catch (error: any) {
+      setError(error.message || 'Failed to delete game');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const generateDefaultDates = () => {
     const now = new Date();
     const twoMonthsLater = new Date();
@@ -165,6 +323,11 @@ export default function AdminPage() {
     
     const maxNumber = Math.max(0, ...seasonNumbers);
     return maxNumber + 1;
+  };
+
+  const getUserName = (userId: string) => {
+    const user = allUsers.find(u => u.id === userId);
+    return user ? `${user.firstName} ${user.lastName}` : 'Unknown Player';
   };
 
   if (loading) {
@@ -190,7 +353,7 @@ export default function AdminPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-gray-600 mt-1">Season Management</p>
+              <p className="text-gray-600 mt-1">Season & Game Management</p>
             </div>
             <button
               onClick={() => router.push('/dashboard')}
@@ -198,6 +361,34 @@ export default function AdminPage() {
             >
               ← Back to Dashboard
             </button>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px">
+              <button
+                onClick={() => setActiveTab('seasons')}
+                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'seasons'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Season Management
+              </button>
+              <button
+                onClick={() => setActiveTab('games')}
+                className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                  activeTab === 'games'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Game Management
+              </button>
+            </nav>
           </div>
         </div>
 
@@ -232,193 +423,422 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Create Season Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Create New Season</h2>
-            <button
-              onClick={() => {
-                setShowCreateForm(!showCreateForm);
-                if (!showCreateForm) {
-                  generateDefaultDates();
-                  setCreateFormData(prev => ({
-                    ...prev,
-                    name: `Season ${getSeasonNumber()}`
-                  }));
-                }
-              }}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            >
-              {showCreateForm ? 'Cancel' : 'Create Season'}
-            </button>
-          </div>
-
-          {showCreateForm && (
-            <form onSubmit={handleCreateSeason} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="seasonName" className="block text-sm font-medium text-gray-700 mb-1">
-                    Season Name
-                  </label>
-                  <input
-                    type="text"
-                    id="seasonName"
-                    value={createFormData.name}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="e.g., Season 2"
-                    required
-                  />
-                </div>
-                
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="deactivateOthers"
-                    checked={createFormData.deactivateOthers}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, deactivateOthers: e.target.checked }))}
-                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="deactivateOthers" className="ml-2 text-sm text-gray-700">
-                    Deactivate all other seasons
-                  </label>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    id="startDate"
-                    value={createFormData.startDate}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    id="endDate"
-                    value={createFormData.endDate}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
+        {/* Season Management Tab */}
+        {activeTab === 'seasons' && (
+          <>
+            {/* Create Season Section */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Create New Season</h2>
                 <button
-                  type="submit"
-                  disabled={actionLoading === 'create'}
-                  className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  onClick={() => {
+                    setShowCreateForm(!showCreateForm);
+                    if (!showCreateForm) {
+                      generateDefaultDates();
+                      setCreateFormData(prev => ({
+                        ...prev,
+                        name: `Season ${getSeasonNumber()}`
+                      }));
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                 >
-                  {actionLoading === 'create' ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Creating...
-                    </div>
-                  ) : (
-                    'Create Season'
-                  )}
+                  {showCreateForm ? 'Cancel' : 'Create Season'}
                 </button>
               </div>
-            </form>
-          )}
-        </div>
 
-        {/* Seasons List */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">All Seasons</h2>
-          
-          {seasonsLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading seasons...</p>
+              {showCreateForm && (
+                <form onSubmit={handleCreateSeason} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="seasonName" className="block text-sm font-medium text-gray-700 mb-1">
+                        Season Name
+                      </label>
+                      <input
+                        type="text"
+                        id="seasonName"
+                        value={createFormData.name}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="e.g., Season 2"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="deactivateOthers"
+                        checked={createFormData.deactivateOthers}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, deactivateOthers: e.target.checked }))}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="deactivateOthers" className="ml-2 text-sm text-gray-700">
+                        Deactivate all other seasons
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        id="startDate"
+                        value={createFormData.startDate}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        id="endDate"
+                        value={createFormData.endDate}
+                        onChange={(e) => setCreateFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={actionLoading === 'create'}
+                      className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {actionLoading === 'create' ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Creating...
+                        </div>
+                      ) : (
+                        'Create Season'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Season
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Start Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      End Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {seasons.map((season) => (
-                    <tr key={season.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{season.name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          season.isActive 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {season.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(season.startDate).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(season.endDate).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                        {season.isActive ? (
-                          <button
-                            onClick={() => handleSeasonAction('deactivate', season.id, season.name)}
-                            disabled={actionLoading === `deactivate-${season.id}`}
-                            className="text-red-600 hover:text-red-900 disabled:opacity-50 transition-colors"
-                          >
-                            {actionLoading === `deactivate-${season.id}` ? 'Deactivating...' : 'Deactivate'}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleSeasonAction('activate', season.id, season.name)}
-                            disabled={actionLoading === `activate-${season.id}`}
-                            className="text-green-600 hover:text-green-900 disabled:opacity-50 transition-colors"
-                          >
-                            {actionLoading === `activate-${season.id}` ? 'Activating...' : 'Activate'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {/* Seasons List */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">All Seasons</h2>
               
-              {seasons.length === 0 && (
+              {seasonsLoading ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No seasons found</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Loading seasons...</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Season
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Start Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          End Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {seasons.map((season) => (
+                        <tr key={season.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{season.name}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              season.isActive 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {season.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {new Date(season.startDate).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {new Date(season.endDate).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            {season.isActive ? (
+                              <button
+                                onClick={() => handleSeasonAction('deactivate', season.id, season.name)}
+                                disabled={actionLoading === `deactivate-${season.id}`}
+                                className="text-red-600 hover:text-red-900 disabled:opacity-50 transition-colors"
+                              >
+                                {actionLoading === `deactivate-${season.id}` ? 'Deactivating...' : 'Deactivate'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleSeasonAction('activate', season.id, season.name)}
+                                disabled={actionLoading === `activate-${season.id}`}
+                                className="text-green-600 hover:text-green-900 disabled:opacity-50 transition-colors"
+                              >
+                                {actionLoading === `activate-${season.id}` ? 'Activating...' : 'Activate'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  {seasons.length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No seasons found</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
+
+        {/* Game Management Tab */}
+        {activeTab === 'games' && (
+          <>
+            {/* Season Selector */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Game Management</h2>
+              <div className="mb-4">
+                <label htmlFor="seasonSelect" className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Season
+                </label>
+                <select
+                  id="seasonSelect"
+                  value={selectedSeason}
+                  onChange={(e) => setSelectedSeason(e.target.value)}
+                  className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                  <option value="">Choose a season...</option>
+                  {seasons.map((season) => (
+                    <option key={season.id} value={season.id}>
+                      {season.name} ({season.isActive ? 'Active' : 'Inactive'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {selectedSeason && (
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700">
+                        <strong>Important:</strong> When you edit or delete a game, the entire season's ELO ratings will be recalculated chronologically to maintain accuracy. This ensures all ratings are based on the correct game sequence.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Games List */}
+            {selectedSeason && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Games for {seasons.find(s => s.id === selectedSeason)?.name}
+                </h3>
+                
+                {gamesLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading games...</p>
+                  </div>
+                ) : games.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No games found for this season</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {games.map((game) => (
+                      <div key={game.id} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                              {/* Team 1 */}
+                              <div className="text-center">
+                                <div className="font-medium text-gray-900">Team 1</div>
+                                <div className="text-sm text-gray-600">
+                                  {game.team1.players.map(p => getUserName(typeof p === 'string' ? p : p.id)).join(' & ')}
+                                </div>
+                                <div className="text-lg font-bold text-gray-900 mt-1">{game.team1.score}</div>
+                              </div>
+
+                              {/* VS and Winner */}
+                              <div className="text-center">
+                                <div className="text-gray-500 text-sm">VS</div>
+                                <div className="mt-2">
+                                  {game.team1.score > game.team2.score ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      🏆 Team 1 Wins
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      🏆 Team 2 Wins
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  ±{game.eloChange} ELO
+                                </div>
+                              </div>
+
+                              {/* Team 2 */}
+                              <div className="text-center">
+                                <div className="font-medium text-gray-900">Team 2</div>
+                                <div className="text-sm text-gray-600">
+                                  {game.team2.players.map(p => getUserName(typeof p === 'string' ? p : p.id)).join(' & ')}
+                                </div>
+                                <div className="text-lg font-bold text-gray-900 mt-1">{game.team2.score}</div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 text-xs text-gray-500 text-center">
+                              Played: {new Date(game.gameTime).toLocaleDateString()} at {new Date(game.gameTime).toLocaleTimeString()}
+                              {game.recordedBy?.name && ` • Recorded by ${game.recordedBy.name}`}
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex flex-col gap-2 ml-4">
+                            <button
+                              onClick={() => handleEditGame(game)}
+                              disabled={actionLoading?.startsWith('edit-') || actionLoading?.startsWith('delete-')}
+                              className="text-xs px-3 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteGame(game.id)}
+                              disabled={actionLoading === `delete-${game.id}` || actionLoading?.startsWith('edit-')}
+                              className="text-xs px-3 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                            >
+                              {actionLoading === `delete-${game.id}` ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Edit Game Modal */}
+        {editingGame && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Edit Game</h3>
+              
+              <div className="space-y-4">
+                {/* Team 1 Score */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Team 1 Score ({editingGame.team1.players.map(p => getUserName(p)).join(' & ')})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={editingGame.team1.score}
+                    onChange={(e) => setEditingGame(prev => prev ? {
+                      ...prev,
+                      team1: { ...prev.team1, score: parseInt(e.target.value) || 0 }
+                    } : null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Team 2 Score */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Team 2 Score ({editingGame.team2.players.map(p => getUserName(p)).join(' & ')})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={editingGame.team2.score}
+                    onChange={(e) => setEditingGame(prev => prev ? {
+                      ...prev,
+                      team2: { ...prev.team2, score: parseInt(e.target.value) || 0 }
+                    } : null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Game Time */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Game Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editingGame.gameTime}
+                    onChange={(e) => setEditingGame(prev => prev ? {
+                      ...prev,
+                      gameTime: e.target.value
+                    } : null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setEditingGame(null)}
+                  disabled={actionLoading?.startsWith('edit-')}
+                  className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveGameEdit}
+                  disabled={actionLoading?.startsWith('edit-')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {actionLoading?.startsWith('edit-') ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </div>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
