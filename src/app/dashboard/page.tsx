@@ -9,24 +9,35 @@ import { Season } from '@/types';
 import { signOut } from '@/client/auth';
 import MatchmakingModal from '@/components/MatchmakingModal';
 
+interface User {
+  isAdmin: boolean;
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+}
+
 export default function Dashboard() {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'rankings'>('game');
   const [refreshKey, setRefreshKey] = useState(0);
   const [showMatchmaking, setShowMatchmaking] = useState(false);
   const router = useRouter();
 
-  // TODO: Replace with real user context
-  const user = {
-    phoneNumber: '+15856831831', // Replace with actual user phone number from auth context
-    isAdmin: false,
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch('/api/users/me');
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
   };
-  if (user.phoneNumber === '+15856831831') {
-    user.isAdmin = true;
-  }
 
   const fetchSeasons = async () => {
     try {
@@ -47,6 +58,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!loading) {
+      fetchUserData();
       fetchSeasons();
     }
   }, [loading]);
@@ -75,6 +87,14 @@ export default function Dashboard() {
             <div className="flex items-center gap-4">
               {currentSeason && (
                 <div className="text-lg text-gray-600 dark:text-gray-300">{currentSeason.name}</div>
+              )}
+              {user?.isAdmin && (
+                <button
+                  onClick={() => router.push('/admin')}
+                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Admin
+                </button>
               )}
               <button
                 onClick={async () => {
