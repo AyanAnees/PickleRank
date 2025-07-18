@@ -209,51 +209,137 @@ export default function SignIn() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    try {
-      if (!consent) {
-        setError('Please accept the Terms of Service and Privacy Policy to continue');
-        setLoading(false);
+    
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        if (!consent) {
+          setError('Please accept the Terms of Service and Privacy Policy to continue');
+          setLoading(false);
+          return;
+        }
+        
+        // Check if user is still authenticated
+        if (!auth.currentUser) {
+          throw new Error('Authentication expired. Please sign in again.');
+        }
+        
+        // Validate input
+        const sanitizedFirstName = firstName.trim();
+        const sanitizedLastName = lastName.trim();
+        
+        if (!sanitizedFirstName || !sanitizedLastName) {
+          throw new Error('Please enter both first and last name');
+        }
+        
+        if (sanitizedFirstName.length < 1 || sanitizedLastName.length < 1) {
+          throw new Error('Names must be at least 1 character long');
+        }
+        
+        // Add debugging info
+        console.log('Registration attempt:', {
+          uid: auth.currentUser.uid,
+          phoneNumber: auth.currentUser.phoneNumber,
+          firstName: sanitizedFirstName,
+          lastName: sanitizedLastName,
+          attempt: retryCount + 1
+        });
+        
+        // Force token refresh to ensure it's valid
+        const idToken = await auth.currentUser.getIdToken(true);
+        console.log('Token obtained, length:', idToken.length);
+        document.cookie = `auth-token=${idToken}; path=/`;
+        
+        const userData = {
+          id: auth.currentUser.uid,
+          phoneNumber: auth.currentUser.phoneNumber || '',
+          displayName: `${sanitizedFirstName} ${sanitizedLastName}`,
+          firstName: sanitizedFirstName,
+          lastName: sanitizedLastName,
+          elo: 1500,
+          gamesPlayed: 0,
+          wins: 0,
+          losses: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isAdmin: false,
+          seasonStats: {}
+        };
+        
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cookie': `auth-token=${idToken}`
+          },
+          body: JSON.stringify(userData),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const data = await response.json();
+          console.error('User registration failed:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: data.error,
+            details: data.details,
+            attempt: retryCount + 1
+          });
+          
+          // If it's a token issue, retry with fresh token
+          if (response.status === 401 && retryCount < maxRetries - 1) {
+            console.log('Token expired, retrying with fresh token...');
+            retryCount++;
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            continue;
+          }
+          
+          throw new Error(data.error || 'Failed to create account');
+        }
+        
+        // Success - break out of retry loop
+        console.log('Registration successful');
+        if (pathname !== '/dashboard') {
+          router.push('/dashboard');
+        }
         return;
+        
+      } catch (err: any) {
+        console.error('Registration error details:', {
+          message: err.message,
+          stack: err.stack,
+          currentUser: !!auth.currentUser,
+          userUID: auth.currentUser?.uid,
+          userPhone: auth.currentUser?.phoneNumber,
+          attempt: retryCount + 1
+        });
+        
+        // If it's an auth error and we have retries left, try again
+        if ((err.message.includes('Authentication expired') || 
+             err.message.includes('Invalid auth token')) && 
+            retryCount < maxRetries - 1) {
+          console.log('Authentication error, retrying...');
+          retryCount++;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+          continue;
+        }
+        
+        // If we've exhausted retries or it's not a retry-able error, show error
+        setError(err.message || 'Failed to create account');
+        document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        break;
       }
-      if (!auth.currentUser) throw new Error('No authenticated user found');
-      const idToken = await auth.currentUser.getIdToken(true);
-      document.cookie = `auth-token=${idToken}; path=/`;
-      const userData = {
-        id: auth.currentUser.uid,
-        phoneNumber: auth.currentUser.phoneNumber || '',
-        displayName: `${firstName} ${lastName}`,
-        firstName,
-        lastName,
-        elo: 1500,
-        gamesPlayed: 0,
-        wins: 0,
-        losses: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isAdmin: false,
-        seasonStats: {}
-      };
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `auth-token=${idToken}`
-        },
-        body: JSON.stringify(userData),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create account');
-      }
-      if (pathname !== '/dashboard') {
-        router.push('/dashboard');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account');
-      document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    } finally {
-      setLoading(false);
     }
+    
+    setLoading(false);
   };
 
   return (
