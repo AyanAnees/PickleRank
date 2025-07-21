@@ -82,32 +82,19 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
-            <div className="flex items-center gap-4">
-              {currentSeason && (
-                <div className="text-lg text-gray-600 dark:text-gray-300">{currentSeason.name}</div>
-              )}
-              {user?.isAdmin && (
-                <button
-                  onClick={() => router.push('/admin')}
-                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Admin
-                </button>
-              )}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">PickleRank Dashboard</h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                {user ? `Hi, ${user.firstName}!` : 'Track your pickleball games and rankings'}
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
               <button
-                onClick={async () => {
-                  try {
-                    await signOut();
-                    router.push('/');
-                  } catch (error) {
-                    console.error('Error signing out:', error);
-                  }
-                }}
-                className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+                onClick={() => setShowMatchmaking(true)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
               >
-                Sign Out
+                Matchmaking
               </button>
             </div>
           </div>
@@ -128,13 +115,6 @@ export default function Dashboard() {
                   </option>
                 ))}
               </select>
-              <button
-                className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm font-medium mt-2 focus:outline-none"
-                onClick={() => setShowMatchmaking(true)}
-                type="button"
-              >
-                MatchMaker
-              </button>
             </div>
           )}
 

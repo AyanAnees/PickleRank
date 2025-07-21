@@ -101,17 +101,21 @@ export async function PUT(request: Request, { params }: { params: { gameId: stri
 
 // Helper: Recalculate all ELO and stats for a season
 async function recalculateSeasonElo(seasonId: string) {
+  console.log(`🔄 Starting ELO recalculation for season: ${seasonId}`);
+  
   // Validate season exists
   const seasonDoc = await db.collection('seasons').doc(seasonId).get();
   if (!seasonDoc.exists) {
     throw new Error('Season does not exist');
   }
 
-  // Get all games for the season, sorted by gameTime
+  // Get all games for the season, sorted by gameTime (CRITICAL: not by createdAt or updatedAt)
   const gamesSnap = await db.collection('games')
     .where('seasonId', '==', seasonId)
-    .orderBy('gameTime', 'asc')
+    .orderBy('gameTime', 'asc')  // This ensures chronological order of when games were actually played
     .get();
+
+  console.log(`📊 Found ${gamesSnap.docs.length} games to replay chronologically`);
 
   type GameDoc = {
     id: string;
@@ -133,12 +137,16 @@ async function recalculateSeasonElo(seasonId: string) {
       return true;
     });
 
+  console.log(`✅ ${games.length} valid games will be replayed in chronological order`);
+
   // Get all player IDs and validate they exist
   const playerIds = new Set<string>();
   games.forEach(game => {
     game.team1.players.forEach(p => playerIds.add(p));
     game.team2.players.forEach(p => playerIds.add(p));
   });
+
+  console.log(`👥 Found ${playerIds.size} unique players`);
 
   // Validate all players exist
   const playerDocs = await Promise.all(
@@ -151,50 +159,75 @@ async function recalculateSeasonElo(seasonId: string) {
   }
 
   // Initialize player stats and ELOs
-  const playerStats: Record<string, { currentStreak: number }> = {};
+  const playerStats: Record<string, { 
+    currentStreak: number; 
+    wins: number; 
+    losses: number;
+    gamesPlayed: number;
+    highestElo: number;
+    lowestElo: number;
+  }> = {};
   const playerElo: Record<string, number> = {};
   const BASE_ELO = 1500;
   
   for (const playerId of playerIds) {
-    playerStats[playerId] = { currentStreak: 0 };
+    playerStats[playerId] = { 
+      currentStreak: 0, 
+      wins: 0, 
+      losses: 0,
+      gamesPlayed: 0,
+      highestElo: BASE_ELO,
+      lowestElo: BASE_ELO
+    };
     playerElo[playerId] = BASE_ELO;
   }
 
-  // Reset all rankings for the season using a transaction
+  console.log(`🔄 Resetting all players to base ELO (${BASE_ELO})`);
+
+  // Reset all rankings for the season
   const rankingsRef = db.collection('rankings');
   const usersRef = db.collection('users');
   
+  // Use batch operations for better performance
+  const batch = db.batch();
+  
   for (const playerId of playerIds) {
-    await db.runTransaction(async (transaction) => {
-      const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
-      const userRef = usersRef.doc(playerId);
-      
-      transaction.set(rankingRef, {
-        seasonId,
-        userId: playerId,
-        currentElo: BASE_ELO,
+    const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
+    const userRef = usersRef.doc(playerId);
+    
+    batch.set(rankingRef, {
+      seasonId,
+      userId: playerId,
+      currentElo: BASE_ELO,
+      wins: 0,
+      losses: 0,
+      updatedAt: new Date(),
+    });
+
+    batch.update(userRef, {
+      [`seasonStats.${seasonId}`]: {
+        eloRating: BASE_ELO,
+        gamesPlayed: 0,
         wins: 0,
         losses: 0,
-        updatedAt: new Date(),
-      });
-
-      transaction.update(userRef, {
-        [`seasonStats.${seasonId}`]: {
-          eloRating: BASE_ELO,
-          gamesPlayed: 0,
-          wins: 0,
-          losses: 0,
-          highestElo: BASE_ELO,
-          lowestElo: BASE_ELO,
-          winStreak: 0,
-          currentStreak: 0,
-        }
-      });
+        highestElo: BASE_ELO,
+        lowestElo: BASE_ELO,
+        winStreak: 0,
+        currentStreak: 0,
+      }
     });
   }
+  
+  await batch.commit();
+  console.log(`✅ Reset complete. Now replaying games chronologically...`);
 
-  // Replay all games to recalculate ELO
-  for (const game of games) {
+  // Replay all games to recalculate ELO in the correct chronological order
+  for (let gameIndex = 0; gameIndex < games.length; gameIndex++) {
+    const game = games[gameIndex];
+    const gameDate = new Date(game.gameTime?.toDate?.() || game.gameTime).toLocaleDateString();
+    
+    console.log(`🎮 Replaying game ${gameIndex + 1}/${games.length} (${gameDate}): ${game.team1.score}-${game.team2.score}`);
+    
     const team1 = game.team1.players;
     const team2 = game.team2.players;
     const team1Elo = team1.reduce((sum, id) => sum + (playerElo[id] || BASE_ELO), 0) / 2;
@@ -203,57 +236,91 @@ async function recalculateSeasonElo(seasonId: string) {
     const scoreDiff = Math.abs(game.team1.score - game.team2.score);
     const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won, scoreDiff));
     
-    // Update team1
+    // Update team1 players
     for (const id of team1) {
       let streakBonus = 0;
       if (team1Won) {
         playerStats[id].currentStreak = (playerStats[id].currentStreak || 0) + 1;
-        streakBonus = getStreakBonus(playerStats[id].currentStreak);
+        if (playerStats[id].currentStreak >= 3) {
+          streakBonus = getStreakBonus(playerStats[id].currentStreak);
+        }
+        playerStats[id].wins++;
       } else {
         playerStats[id].currentStreak = 0;
+        playerStats[id].losses++;
       }
+      
+      playerStats[id].gamesPlayed++;
+      const oldElo = playerElo[id];
       playerElo[id] = Math.max(0, playerElo[id] + (team1Won ? eloChange + streakBonus : -eloChange));
+      
+      // Track highest/lowest
+      playerStats[id].highestElo = Math.max(playerStats[id].highestElo, playerElo[id]);
+      playerStats[id].lowestElo = Math.min(playerStats[id].lowestElo, playerElo[id]);
+      
+      console.log(`  👤 ${id}: ${oldElo} → ${playerElo[id]} (${team1Won ? '+' : '-'}${eloChange}${streakBonus > 0 ? ` +${streakBonus} streak` : ''})`);
     }
 
-    // Update team2
+    // Update team2 players
     for (const id of team2) {
       let streakBonus = 0;
       if (!team1Won) {
         playerStats[id].currentStreak = (playerStats[id].currentStreak || 0) + 1;
-        streakBonus = getStreakBonus(playerStats[id].currentStreak);
+        if (playerStats[id].currentStreak >= 3) {
+          streakBonus = getStreakBonus(playerStats[id].currentStreak);
+        }
+        playerStats[id].wins++;
       } else {
         playerStats[id].currentStreak = 0;
+        playerStats[id].losses++;
       }
+      
+      playerStats[id].gamesPlayed++;
+      const oldElo = playerElo[id];
       playerElo[id] = Math.max(0, playerElo[id] + (team1Won ? -eloChange : eloChange + streakBonus));
-    }
-
-    // Update rankings and user stats
-    for (const id of [...team1, ...team2]) {
-      const won = (team1Won && team1.includes(id)) || (!team1Won && team2.includes(id));
-      await db.runTransaction(async (transaction) => {
-        const rankingRef = rankingsRef.doc(`${seasonId}_${id}`);
-        const userRef = usersRef.doc(id);
-        
-        transaction.update(rankingRef, {
-          currentElo: playerElo[id],
-          wins: (await rankingRef.get()).data()?.wins + (won ? 1 : 0),
-          losses: (await rankingRef.get()).data()?.losses + (won ? 0 : 1),
-          updatedAt: new Date(),
-        });
-
-        transaction.update(userRef, {
-          [`seasonStats.${seasonId}`]: {
-            eloRating: playerElo[id],
-            gamesPlayed: (await userRef.get()).data()?.seasonStats?.[seasonId]?.gamesPlayed + 1,
-            wins: (await userRef.get()).data()?.seasonStats?.[seasonId]?.wins + (won ? 1 : 0),
-            losses: (await userRef.get()).data()?.seasonStats?.[seasonId]?.losses + (won ? 0 : 1),
-            highestElo: Math.max((await userRef.get()).data()?.seasonStats?.[seasonId]?.highestElo || BASE_ELO, playerElo[id]),
-            lowestElo: Math.min((await userRef.get()).data()?.seasonStats?.[seasonId]?.lowestElo || BASE_ELO, playerElo[id]),
-            winStreak: won ? (await userRef.get()).data()?.seasonStats?.[seasonId]?.winStreak + 1 : 0,
-            currentStreak: playerStats[id].currentStreak,
-          }
-        });
-      });
+      
+      // Track highest/lowest
+      playerStats[id].highestElo = Math.max(playerStats[id].highestElo, playerElo[id]);
+      playerStats[id].lowestElo = Math.min(playerStats[id].lowestElo, playerElo[id]);
+      
+      console.log(`  👤 ${id}: ${oldElo} → ${playerElo[id]} (${!team1Won ? '+' : '-'}${eloChange}${streakBonus > 0 ? ` +${streakBonus} streak` : ''})`);
     }
   }
+
+  console.log(`💾 Saving final stats to database...`);
+
+  // Save final results using batch operations
+  const finalBatch = db.batch();
+  
+  for (const playerId of playerIds) {
+    const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
+    const userRef = usersRef.doc(playerId);
+    const stats = playerStats[playerId];
+    
+    finalBatch.update(rankingRef, {
+      currentElo: playerElo[playerId],
+      wins: stats.wins,
+      losses: stats.losses,
+      updatedAt: new Date(),
+    });
+
+    finalBatch.update(userRef, {
+      [`seasonStats.${seasonId}`]: {
+        eloRating: playerElo[playerId],
+        gamesPlayed: stats.gamesPlayed,
+        wins: stats.wins,
+        losses: stats.losses,
+        highestElo: stats.highestElo,
+        lowestElo: stats.lowestElo,
+        winStreak: stats.currentStreak > 0 ? stats.currentStreak : 0,
+        currentStreak: stats.currentStreak,
+      },
+      elo: playerElo[playerId], // Update main ELO field
+    });
+    
+    console.log(`  📊 ${playerId}: Final ELO ${playerElo[playerId]} (${stats.wins}W-${stats.losses}L, ${stats.gamesPlayed} games)`);
+  }
+  
+  await finalBatch.commit();
+  console.log(`✅ ELO recalculation complete for season ${seasonId}`);
 } 
