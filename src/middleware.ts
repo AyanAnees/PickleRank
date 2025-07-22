@@ -11,11 +11,10 @@ const publicPaths = [
   '/api/users/me'
 ];
 
-// Define paths that require admin access
-const adminPaths = [
-  '/admin',
-  '/api/admin'
-];
+// Function to check if path requires admin access
+const requiresAdmin = (pathname: string): boolean => {
+  return pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
+};
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -91,7 +90,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Check admin access for admin routes
-    if (adminPaths.includes(pathname) && !userData.isAdmin) {
+    if (requiresAdmin(pathname) && !userData.isAdmin) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
 

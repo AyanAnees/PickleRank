@@ -9,24 +9,35 @@ import { Season } from '@/types';
 import { signOut } from '@/client/auth';
 import MatchmakingModal from '@/components/MatchmakingModal';
 
+interface User {
+  isAdmin: boolean;
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+}
+
 export default function Dashboard() {
   const [currentSeason, setCurrentSeason] = useState<Season | null>(null);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'game' | 'rankings'>('game');
   const [refreshKey, setRefreshKey] = useState(0);
   const [showMatchmaking, setShowMatchmaking] = useState(false);
   const router = useRouter();
 
-  // TODO: Replace with real user context
-  const user = {
-    phoneNumber: '+15856831831', // Replace with actual user phone number from auth context
-    isAdmin: false,
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch('/api/users/me');
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
   };
-  if (user.phoneNumber === '+15856831831') {
-    user.isAdmin = true;
-  }
 
   const fetchSeasons = async () => {
     try {
@@ -47,6 +58,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!loading) {
+      fetchUserData();
       fetchSeasons();
     }
   }, [loading]);
@@ -70,24 +82,19 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
-            <div className="flex items-center gap-4">
-              {currentSeason && (
-                <div className="text-lg text-gray-600 dark:text-gray-300">{currentSeason.name}</div>
-              )}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">PickleRank Dashboard</h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                {user ? `Hi, ${user.firstName}` : 'Track your pickleball games and rankings'}
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
               <button
-                onClick={async () => {
-                  try {
-                    await signOut();
-                    router.push('/');
-                  } catch (error) {
-                    console.error('Error signing out:', error);
-                  }
-                }}
-                className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+                onClick={() => setShowMatchmaking(true)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
               >
-                Sign Out
+                Matchmaking
               </button>
             </div>
           </div>
@@ -108,13 +115,6 @@ export default function Dashboard() {
                   </option>
                 ))}
               </select>
-              <button
-                className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm font-medium mt-2 focus:outline-none"
-                onClick={() => setShowMatchmaking(true)}
-                type="button"
-              >
-                MatchMaker
-              </button>
             </div>
           )}
 

@@ -9,18 +9,19 @@ interface Team {
   score: number;
 }
 
-const ADMIN_PHONE = '+15856831831';
-
-async function isAdmin(request: Request) {
-  // Get user from auth token (assume phoneNumber is available in user record)
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) return false;
-  const idToken = authHeader.replace('Bearer ', '');
+async function isAdmin(request: Request): Promise<boolean> {
   try {
-    const { getAuth } = await import('firebase-admin/auth');
-    const decoded = await getAuth().verifyIdToken(idToken);
-    return decoded.phone_number === ADMIN_PHONE;
-  } catch {
+    const authToken = request.headers.get('cookie')?.split('auth-token=')[1]?.split(';')[0];
+    if (!authToken) return false;
+    
+    const decodedToken = await adminAuth.verifyIdToken(authToken);
+    const userId = decodedToken.uid;
+    
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+    
+    return userData?.isAdmin === true;
+  } catch (error) {
     return false;
   }
 }
@@ -380,11 +381,16 @@ export async function PUT(request: Request, { params }: { params: { gameId: stri
 
 // Helper: Recalculate all ELO and stats for a season
 async function recalculateSeasonElo(seasonId: string) {
-  // Get all games for the season, sorted by gameTime
+  console.log(`🔄 Starting ELO recalculation for season: ${seasonId}`);
+  
+  // Get all games for the season, sorted by gameTime (CRITICAL: chronological order)
   const gamesSnap = await db.collection('games')
     .where('seasonId', '==', seasonId)
-    .orderBy('gameTime', 'asc')
+    .orderBy('gameTime', 'asc')  // Sort by when games were actually played, not when created/edited
     .get();
+    
+  console.log(`📊 Found ${gamesSnap.docs.length} games to replay chronologically`);
+    
   type GameDoc = {
     id: string;
     team1: { players: string[]; score: number };
@@ -394,54 +400,114 @@ async function recalculateSeasonElo(seasonId: string) {
   const games: GameDoc[] = gamesSnap.docs
     .map(doc => ({ id: doc.id, ...doc.data() }) as Partial<GameDoc>)
     .filter((g): g is GameDoc => !!g && typeof g.team1 === 'object' && typeof g.team2 === 'object' && Array.isArray(g.team1.players) && Array.isArray(g.team2.players));
+    
+  console.log(`✅ ${games.length} valid games will be replayed in chronological order`);
+    
   // Get all player IDs
   const playerIds = new Set<string>();
   games.forEach(game => {
     game.team1.players.forEach((p: string) => playerIds.add(p));
     game.team2.players.forEach((p: string) => playerIds.add(p));
   });
+  
+  console.log(`👥 Found ${playerIds.size} unique players`);
+  
   // Reset all rankings for the season
   const rankingsRef = db.collection('rankings');
+  const usersRef = db.collection('users');
+  const BASE_ELO = 1500;
+  
+  // Use batch operations for better performance
+  const batch = db.batch();
+  
   for (const playerId of playerIds) {
-    await rankingsRef.doc(`${seasonId}_${playerId}`).set({
+    const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
+    
+    batch.set(rankingRef, {
       seasonId,
       userId: playerId,
-      currentElo: 1500,
+      currentElo: BASE_ELO,
       wins: 0,
       losses: 0,
       updatedAt: new Date(),
     });
   }
-  // Replay all games to recalculate ELO
-  for (const game of games) {
+  
+  await batch.commit();
+  console.log(`🔄 Reset all players to base ELO (${BASE_ELO}). Now replaying games...`);
+  
+  // Track ELOs in memory for efficiency
+  const playerElo: Record<string, number> = {};
+  const playerStats: Record<string, { wins: number; losses: number }> = {};
+  
+  for (const playerId of playerIds) {
+    playerElo[playerId] = BASE_ELO;
+    playerStats[playerId] = { wins: 0, losses: 0 };
+  }
+  
+  // Replay all games to recalculate ELO in chronological order
+  for (let gameIndex = 0; gameIndex < games.length; gameIndex++) {
+    const game = games[gameIndex];
     if (!game || !game.team1 || !game.team2 || !Array.isArray(game.team1.players) || !Array.isArray(game.team2.players)) continue;
-    // Get current ELOs
-    const team1Docs = await Promise.all(game.team1.players.map((pid: string) => rankingsRef.doc(`${seasonId}_${pid}`).get()));
-    const team2Docs = await Promise.all(game.team2.players.map((pid: string) => rankingsRef.doc(`${seasonId}_${pid}`).get()));
-    const team1Elo = team1Docs.reduce((sum: number, doc) => sum + (doc.data()?.currentElo || 1500), 0) / 2;
-    const team2Elo = team2Docs.reduce((sum: number, doc) => sum + (doc.data()?.currentElo || 1500), 0) / 2;
+    
+    const gameDate = new Date(game.gameTime?.toDate?.() || game.gameTime).toLocaleDateString();
+    console.log(`🎮 Replaying game ${gameIndex + 1}/${games.length} (${gameDate}): ${game.team1.score}-${game.team2.score}`);
+    
+    // Get current ELOs from memory
+    const team1Elo = game.team1.players.reduce((sum: number, pid: string) => sum + (playerElo[pid] || BASE_ELO), 0) / 2;
+    const team2Elo = game.team2.players.reduce((sum: number, pid: string) => sum + (playerElo[pid] || BASE_ELO), 0) / 2;
     const team1Won = game.team1.score > game.team2.score;
     const scoreDiff = Math.abs(game.team1.score - game.team2.score);
     const eloChange = Math.abs(calculateEloChange(team1Elo, team2Elo, team1Won, scoreDiff));
-    // Update team1
-    for (const doc of team1Docs) {
-      const data = doc.data() || { currentElo: 1500, wins: 0, losses: 0 };
-      await doc.ref.update({
-        currentElo: data.currentElo + (team1Won ? eloChange : -eloChange),
-        wins: (data.wins || 0) + (team1Won ? 1 : 0),
-        losses: (data.losses || 0) + (team1Won ? 0 : 1),
-        updatedAt: new Date(),
-      });
+    
+    // Update team1 in memory
+    for (const pid of game.team1.players) {
+      const oldElo = playerElo[pid];
+      playerElo[pid] = Math.max(0, playerElo[pid] + (team1Won ? eloChange : -eloChange));
+      
+      if (team1Won) {
+        playerStats[pid].wins++;
+      } else {
+        playerStats[pid].losses++;
+      }
+      
+      console.log(`  👤 Team1 ${pid}: ${oldElo} → ${playerElo[pid]} (${team1Won ? '+' : '-'}${eloChange})`);
     }
-    // Update team2
-    for (const doc of team2Docs) {
-      const data = doc.data() || { currentElo: 1500, wins: 0, losses: 0 };
-      await doc.ref.update({
-        currentElo: data.currentElo + (team1Won ? -eloChange : eloChange),
-        wins: (data.wins || 0) + (team1Won ? 0 : 1),
-        losses: (data.losses || 0) + (team1Won ? 1 : 0),
-        updatedAt: new Date(),
-      });
+    
+    // Update team2 in memory
+    for (const pid of game.team2.players) {
+      const oldElo = playerElo[pid];
+      playerElo[pid] = Math.max(0, playerElo[pid] + (team1Won ? -eloChange : eloChange));
+      
+      if (!team1Won) {
+        playerStats[pid].wins++;
+      } else {
+        playerStats[pid].losses++;
+      }
+      
+      console.log(`  👤 Team2 ${pid}: ${oldElo} → ${playerElo[pid]} (${!team1Won ? '+' : '-'}${eloChange})`);
     }
   }
+  
+  console.log(`💾 Saving final stats to database...`);
+  
+  // Save final results using batch operations
+  const finalBatch = db.batch();
+  
+  for (const playerId of playerIds) {
+    const rankingRef = rankingsRef.doc(`${seasonId}_${playerId}`);
+    const stats = playerStats[playerId];
+    
+    finalBatch.update(rankingRef, {
+      currentElo: playerElo[playerId],
+      wins: stats.wins,
+      losses: stats.losses,
+      updatedAt: new Date(),
+    });
+    
+    console.log(`  📊 ${playerId}: Final ELO ${playerElo[playerId]} (${stats.wins}W-${stats.losses}L)`);
+  }
+  
+  await finalBatch.commit();
+  console.log(`✅ ELO recalculation complete for season ${seasonId}`);
 } 
