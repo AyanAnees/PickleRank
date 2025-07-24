@@ -84,9 +84,9 @@ export default function Dashboard() {
         <div className="space-y-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">PickleRank Dashboard</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
               <p className="text-gray-600 dark:text-gray-300">
-                {user ? `Hi, ${user.firstName}` : 'Track your pickleball games and rankings'}
+                {user ? `Hi, ${user.firstName} welcome to PickleRank!` : 'Track your pickleball games and rankings'}
               </p>
             </div>
             <div className="flex items-center space-x-4">
@@ -161,7 +161,7 @@ export default function Dashboard() {
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
-                    Current Rankings
+                    Season Rankings
                   </button>
                 </nav>
               </div>
