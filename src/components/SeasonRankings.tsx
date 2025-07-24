@@ -70,7 +70,7 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
   if (rankings.length === 0 && unranked.length === 0) {
     return (
       <div className="card space-y-4">
-        <h3 className="text-xl font-semibold">Current Season Rankings</h3>
+        <h3 className="text-xl font-semibold">Season Rankings</h3>
         <p className="text-gray-500">No games played yet</p>
       </div>
     );
@@ -78,7 +78,7 @@ export default function SeasonRankings({ seasonId }: SeasonRankingsProps) {
 
   return (
     <div className="card space-y-4">
-      <h3 className="text-xl font-semibold">Current Season Rankings</h3>
+      <h3 className="text-xl font-semibold">Season Rankings</h3>
       <div className="space-y-2">
         {rankings.map((ranking, index) => {
           const user = users.find(u => u.id === ranking.userId);
