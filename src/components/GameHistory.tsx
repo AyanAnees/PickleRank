@@ -151,7 +151,7 @@ export default function GameHistory({ seasonId, refreshKey }: GameHistoryProps) 
   if (!Array.isArray(games) || games.length === 0) {
     return (
       <div className="card space-y-4">
-        <h3 className="text-xl font-semibold">Game History</h3>
+        <h3 className="text-xl font-semibold">Recent Games</h3>
         <p className="text-gray-500">No games have been played yet in this season.</p>
       </div>
     );
